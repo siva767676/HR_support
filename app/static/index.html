@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Resume Screening &amp; Scoring System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --accent:#4f46e5; --accent-d:#4338ca; --accent-soft:#eef2ff;
+    --navy:#0f172a;
+    --bg:#f6f7f9; --surface:#fff; --surface-2:#f8fafc;
+    --line:#e7e9ee; --line-2:#dfe2e8;
+    --text:#0f172a; --text-2:#334155; --muted:#64748b; --muted-2:#94a3b8;
+    --green:#15803d; --green-soft:#dcfce7; --amber:#b45309; --amber-soft:#fef3c7;
+    --red:#b91c1c; --red-soft:#fee2e2;
+    --shadow-sm:0 1px 2px rgba(15,23,42,.05);
+    --shadow:0 1px 3px rgba(15,23,42,.06),0 1px 2px rgba(15,23,42,.04);
+    --shadow-md:0 6px 20px rgba(15,23,42,.1);
+    --radius:10px; --radius-sm:8px;
+  }
+  *{ box-sizing:border-box; }
+  html{ -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
+  body{ margin:0; font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;
+        background:var(--bg); color:var(--text); font-size:14px; line-height:1.5; }
+  svg.ic{ display:inline-block; vertical-align:middle; flex:none; }
+  .num,.score{ font-variant-numeric:tabular-nums; }
+
+  /* ---------- Navbar ---------- */
+  .nav{ position:sticky; top:0; z-index:50; background:var(--navy); }
+  .nav-inner{ max-width:1240px; margin:0 auto; padding:0 28px; height:64px; display:flex;
+              align-items:center; justify-content:space-between; gap:18px; }
+  .nav-logo{ display:flex; align-items:center; gap:12px; cursor:pointer; }
+  .nav-logo .mark{ width:36px; height:36px; border-radius:9px; flex:none; color:#fff;
+                   background:linear-gradient(135deg,#6366f1,#4f46e5); display:flex;
+                   align-items:center; justify-content:center; box-shadow:0 2px 10px rgba(79,70,229,.5); }
+  .nav-logo .txt{ color:#fff; font-size:15.5px; font-weight:700; letter-spacing:-.01em; line-height:1.15; }
+  .nav-logo .txt small{ display:block; font-size:10px; font-weight:500; color:#94a3b8;
+                        letter-spacing:.09em; text-transform:uppercase; margin-top:3px; }
+  .nav-links{ display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+  .nav-links a{ display:inline-flex; align-items:center; padding:8px 14px; border-radius:8px;
+                font-size:13.5px; font-weight:500; color:#cbd5e1; cursor:pointer; white-space:nowrap;
+                transition:background .15s,color .15s; }
+  .nav-links a:hover{ background:rgba(255,255,255,.07); color:#fff; }
+  .nav-links a.active{ background:var(--accent); color:#fff; font-weight:600; }
+  .nav-links a .dot{ display:inline-flex; align-items:center; justify-content:center; min-width:20px;
+                     height:18px; padding:0 6px; margin-left:8px; border-radius:9px;
+                     background:rgba(255,255,255,.14); color:#fff; font-size:11px; font-weight:700;
+                     font-variant-numeric:tabular-nums; }
+  .nav-links a.active .dot{ background:rgba(255,255,255,.24); }
+
+  /* ---------- Layout & type ---------- */
+  .wrap{ max-width:1240px; margin:0 auto; padding:36px 28px 80px; }
+  .page{ display:none; animation:fade .25s ease; }
+  .page.active{ display:block; }
+  @keyframes fade{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
+  .eyebrow{ font-size:11.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+            color:var(--accent); margin:0 0 10px; }
+  h1{ font-size:27px; font-weight:700; margin:0 0 8px; letter-spacing:-.025em; }
+  h2{ font-size:18px; font-weight:700; margin:0 0 4px; letter-spacing:-.015em; }
+  .sub{ color:var(--muted); font-size:14.5px; margin:0 0 28px; max-width:760px; line-height:1.6; }
+  .card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+         padding:26px 28px; margin-bottom:20px; box-shadow:var(--shadow-sm); }
+  .grid{ display:grid; grid-template-columns:1fr 1fr; gap:28px; }
+  .sec{ font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+        color:var(--muted); margin:0 0 12px; }
+
+  /* ---------- Drop zones ---------- */
+  .drop{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:9px;
+         border:1.5px dashed var(--line-2); border-radius:var(--radius); padding:28px 20px; min-height:152px;
+         text-align:center; cursor:pointer; background:var(--surface-2);
+         transition:border-color .15s,background .15s; }
+  .drop:hover{ border-color:var(--accent); background:var(--accent-soft); }
+  .drop .drop-ico{ width:46px; height:46px; border-radius:12px; display:flex; align-items:center;
+                   justify-content:center; background:#fff; border:1px solid var(--line); color:var(--accent);
+                   box-shadow:var(--shadow-sm); }
+  .drop .drop-title{ font-size:14px; font-weight:600; color:var(--text-2); }
+  .drop .drop-hint{ font-size:12px; color:var(--muted-2); }
+  .drop.haspick{ border-style:solid; border-color:var(--green); background:#f3faf5; }
+  .drop.haspick .drop-ico{ color:var(--green); border-color:#bbf7d0; }
+  .drop.haspick .drop-title{ color:var(--text); }
+
+  /* ---------- Actions ---------- */
+  .actions{ display:flex; gap:18px; align-items:center; margin-top:24px; flex-wrap:wrap; }
+  #go{ display:inline-flex; align-items:center; gap:8px; background:var(--accent); color:#fff; border:0;
+       border-radius:var(--radius-sm); padding:11px 26px; font-size:14px; font-weight:600; font-family:inherit;
+       cursor:pointer; box-shadow:var(--shadow-sm); transition:background .15s,box-shadow .15s; }
+  #go:hover:not(:disabled){ background:var(--accent-d); box-shadow:var(--shadow); }
+  #go:disabled{ background:#cbd0d8; cursor:default; box-shadow:none; }
+  #pickInfo{ font-size:13.5px; color:var(--text-2); }
+
+  .topk{ display:flex; gap:9px; align-items:center; font-size:13px; color:var(--muted); margin-left:auto; }
+  .topk label{ font-weight:600; color:var(--text-2); }
+  .stepper{ display:inline-flex; align-items:center; border:1px solid var(--line-2); border-radius:var(--radius-sm);
+            overflow:hidden; background:#fff; box-shadow:var(--shadow-sm); }
+  .stepper button{ width:34px; height:38px; border:0; background:var(--surface-2); color:var(--text-2);
+                   font-size:17px; font-weight:600; line-height:1; cursor:pointer; transition:background .15s,color .15s; }
+  .stepper button:hover{ background:#eef1f5; color:var(--accent); }
+  .stepper input{ width:52px; height:38px; border:0; border-left:1px solid var(--line); border-right:1px solid var(--line);
+                  text-align:center; font-size:14px; font-weight:700; color:var(--text); background:#fff;
+                  font-variant-numeric:tabular-nums; -moz-appearance:textfield; }
+  .stepper input:focus{ outline:2px solid var(--accent); outline-offset:-2px; }
+  .stepper input::-webkit-outer-spin-button,.stepper input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+  .tip{ position:relative; display:inline-flex; color:var(--muted-2); cursor:help; }
+  .tip:hover{ color:var(--accent); }
+  .tip-pop{ position:absolute; bottom:165%; left:50%; transform:translateX(-50%); width:236px;
+            background:var(--navy); color:#e2e8f0; padding:10px 12px; border-radius:8px; font-size:12px;
+            line-height:1.5; font-weight:400; text-align:left; opacity:0; visibility:hidden; transition:opacity .15s;
+            z-index:30; box-shadow:var(--shadow-md); pointer-events:none; }
+  .tip-pop::after{ content:""; position:absolute; top:100%; left:50%; transform:translateX(-50%);
+                   border:6px solid transparent; border-top-color:var(--navy); }
+  .tip:hover .tip-pop,.tip:focus .tip-pop{ opacity:1; visibility:visible; }
+
+  /* ---------- Status + progress ---------- */
+  #status{ margin:6px 0 14px; font-size:13.5px; color:var(--muted); display:flex; align-items:center;
+           gap:8px; flex-wrap:wrap; }
+  #status .ok{ color:var(--green); display:inline-flex; }
+  .bar{ height:6px; background:var(--line); border-radius:999px; overflow:hidden; margin-bottom:20px; display:none; }
+  .bar>div{ height:100%; width:0; background:linear-gradient(90deg,#6366f1,var(--accent)); border-radius:999px; transition:width .4s; }
+
+  /* ---------- Results table ---------- */
+  table{ width:100%; border-collapse:collapse; font-size:14px; }
+  th,td{ text-align:left; padding:12px 10px; border-bottom:1px solid var(--line); }
+  th{ font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted-2); }
+  tbody tr.main{ cursor:pointer; transition:background .12s; }
+  tbody tr.main:hover{ background:var(--surface-2); }
+  .rank{ display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px;
+         border-radius:8px; background:var(--accent-soft); color:var(--accent); font-weight:700; font-size:13px;
+         font-variant-numeric:tabular-nums; }
+  .rank.top{ background:var(--accent); color:#fff; }
+  .badge{ display:inline-flex; align-items:center; gap:6px; padding:4px 11px; border-radius:999px;
+          font-size:12px; font-weight:600; }
+  .badge::before{ content:""; width:6px; height:6px; border-radius:50%; background:currentColor; }
+  .strong{ background:var(--green-soft); color:var(--green); }
+  .good{ background:var(--amber-soft); color:var(--amber); }
+  .weak{ background:var(--red-soft); color:var(--red); }
+  .none{ background:#eef1f5; color:var(--muted); }
+  .score{ font-weight:700; font-size:15px; }
+  tr.detail{ display:none; background:var(--surface-2); }
+  tr.detail.open{ display:table-row; }
+  tr.detail td{ padding:18px 22px; }
+  .cols{ display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+  .detail h4,.blk h4{ margin:0 0 9px; font-size:11.5px; font-weight:700; text-transform:uppercase;
+                      letter-spacing:.04em; color:var(--muted); }
+  .detail ul{ margin:0 0 14px; padding-left:18px; font-size:13px; line-height:1.55; color:var(--text-2); }
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chips span{ display:inline-block; padding:3px 10px; border-radius:7px; font-size:12px; font-weight:500;
+               background:var(--accent-soft); color:var(--accent); }
+  .chips span.miss{ background:var(--red-soft); color:var(--red); }
+  .meter{ display:flex; align-items:center; gap:10px; margin-bottom:7px; font-size:12.5px; }
+  .meter .label{ width:178px; color:var(--muted); flex:none; }
+  .meter .track{ flex:1; height:7px; background:var(--line); border-radius:999px; overflow:hidden; }
+  .meter .fill{ height:100%; background:var(--accent); border-radius:999px; }
+  .meter .val{ width:34px; text-align:right; font-weight:700; font-variant-numeric:tabular-nums; }
+  .summary{ font-size:13px; margin-bottom:16px; color:var(--text-2); line-height:1.6;
+            padding:12px 14px; background:#fff; border:1px solid var(--line); border-left:3px solid var(--accent);
+            border-radius:0 8px 8px 0; }
+  .errtext{ color:var(--red); font-size:13px; }
+
+  /* ---------- Pagination ---------- */
+  .pager{ display:flex; align-items:center; justify-content:space-between; gap:14px; margin-top:20px; flex-wrap:wrap; }
+  .pager:empty{ display:none; }
+  .pager .info{ font-size:13px; color:var(--muted); }
+  .pager .info b{ color:var(--text); font-variant-numeric:tabular-nums; }
+  .pager-ctrls{ display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
+  .pager-ctrls button,.pager-ctrls .pg{ min-width:38px; height:38px; padding:0 12px; border:1px solid var(--line);
+           background:#fff; border-radius:var(--radius-sm); font-size:13px; font-weight:600; color:var(--text-2);
+           font-family:inherit; cursor:pointer; font-variant-numeric:tabular-nums;
+           transition:background .15s,color .15s,border-color .15s; }
+  .pager-ctrls button:hover:not(:disabled),.pager-ctrls .pg:hover:not(.active):not(.ellipsis){
+           background:var(--surface-2); border-color:var(--line-2); color:var(--accent); }
+  .pager-ctrls button:disabled{ opacity:.4; cursor:default; }
+  .pager-ctrls .pg.active{ background:var(--accent); color:#fff; border-color:var(--accent); cursor:default; }
+  .pager-ctrls .ellipsis{ border:0; background:none; cursor:default; color:var(--muted-2); padding:0 2px; min-width:auto; }
+
+  /* ---------- Stat cards (dashboard) ---------- */
+  .stats{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:18px; margin-bottom:22px; }
+  .stat{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:22px;
+         box-shadow:var(--shadow-sm); }
+  .stat .ico{ width:42px; height:42px; border-radius:11px; display:flex; align-items:center; justify-content:center;
+              margin-bottom:16px; }
+  .stat .num{ font-size:30px; font-weight:700; letter-spacing:-.03em; line-height:1; }
+  .stat .lbl{ color:var(--muted); font-size:13px; margin-top:7px; }
+  .i-blue{ background:#eef2ff; color:#4f46e5; } .i-green{ background:#ecfdf3; color:#15803d; }
+  .i-cyan{ background:#ecfeff; color:#0e7490; } .i-violet{ background:#f5f3ff; color:#7c3aed; }
+  .i-amber{ background:#fffbeb; color:#b45309; }
+  .insights{ display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .insights .card{ margin-bottom:0; }
+  .insights h2{ margin-bottom:16px; }
+  .insights table td{ padding:10px 4px; font-size:13.5px; color:var(--text-2); border-bottom:1px solid var(--line); }
+  .insights table tr:last-child td{ border-bottom:0; }
+  .insights table td b{ color:var(--text); font-variant-numeric:tabular-nums; }
+  .recbar{ display:flex; height:12px; border-radius:999px; overflow:hidden; margin:14px 0 12px; background:var(--line); }
+  .recbar>div{ height:100%; }
+  .leg{ display:flex; gap:18px; flex-wrap:wrap; font-size:13px; color:var(--muted); }
+  .leg span b{ color:var(--text); font-variant-numeric:tabular-nums; }
+  .dotmark{ display:inline-block; width:9px; height:9px; border-radius:3px; margin-right:7px; vertical-align:middle; }
+
+  /* ---------- Shortlisted candidate cards ---------- */
+  .cand{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); margin-bottom:18px;
+         box-shadow:var(--shadow-sm); overflow:hidden; }
+  .cand-head{ display:flex; align-items:center; gap:18px; padding:20px 24px; border-bottom:1px solid var(--line);
+              background:var(--surface-2); flex-wrap:wrap; }
+  .cand-rank{ width:44px; height:44px; border-radius:11px; flex:none; display:flex; align-items:center;
+              justify-content:center; font-size:17px; font-weight:700; background:var(--accent); color:#fff;
+              font-variant-numeric:tabular-nums; }
+  .cand-id{ flex:1; min-width:180px; }
+  .cand-id .nm{ font-size:16px; font-weight:700; }
+  .cand-id .fn{ font-size:12px; color:var(--muted); margin-top:3px; }
+  .cand-score{ text-align:center; padding:0 6px; }
+  .cand-score .v{ font-size:28px; font-weight:800; letter-spacing:-.03em; line-height:1; color:var(--accent);
+                  font-variant-numeric:tabular-nums; }
+  .cand-score .l{ font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-top:5px; }
+  .cand-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+  .btn-sm{ display:inline-flex; align-items:center; gap:6px; padding:8px 13px; border-radius:var(--radius-sm);
+           font-size:13px; font-weight:600; font-family:inherit; cursor:pointer; border:1px solid var(--line-2);
+           background:#fff; color:var(--text-2); transition:background .15s,border-color .15s,color .15s; }
+  .btn-sm:hover:not(:disabled){ background:var(--surface-2); color:var(--accent); }
+  .btn-sm.primary{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  .btn-sm.primary:hover:not(:disabled){ background:var(--accent-d); color:#fff; }
+  .btn-sm:disabled{ opacity:.45; cursor:default; }
+  .cand-body{ padding:22px 24px; }
+  .blk{ margin-bottom:18px; }
+  .blk:last-child{ margin-bottom:0; }
+  .blk p{ margin:0; font-size:13.5px; line-height:1.6; color:var(--text-2); }
+  .blk ul{ margin:0; padding-left:18px; font-size:13.5px; line-height:1.6; color:var(--text-2); }
+
+  /* ---------- Empty state ---------- */
+  .empty{ text-align:center; padding:64px 24px; }
+  .empty .empty-ico{ width:64px; height:64px; border-radius:16px; margin:0 auto 18px; display:flex;
+                     align-items:center; justify-content:center; background:var(--accent-soft); color:var(--accent); }
+  .empty h3{ margin:0 0 8px; font-size:17px; font-weight:700; }
+  .empty p{ margin:0 auto 22px; font-size:14px; color:var(--muted); max-width:420px; }
+  .empty button{ display:inline-flex; align-items:center; gap:8px; background:var(--accent); color:#fff; border:0;
+                 border-radius:var(--radius-sm); padding:11px 24px; font-size:14px; font-weight:600;
+                 font-family:inherit; cursor:pointer; }
+  .empty button:hover{ background:var(--accent-d); }
+
+  /* ---------- About ---------- */
+  .feat{ display:grid; grid-template-columns:repeat(auto-fit,minmax(248px,1fr)); gap:18px; }
+  .feat .f{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:24px;
+            box-shadow:var(--shadow-sm); }
+  .feat .f .ico{ width:44px; height:44px; border-radius:11px; display:flex; align-items:center; justify-content:center;
+                 background:var(--accent-soft); color:var(--accent); margin-bottom:14px; }
+  .feat .f h4{ margin:0 0 7px; font-size:15px; font-weight:700; }
+  .feat .f p{ margin:0; font-size:13px; color:var(--muted); line-height:1.6; }
+  .steps{ counter-reset:step; margin:20px 0 0; padding:0; list-style:none; }
+  .steps li{ position:relative; padding:0 0 20px 46px; font-size:14px; line-height:1.55; color:var(--text-2); }
+  .steps li:last-child{ padding-bottom:0; }
+  .steps li::before{ counter-increment:step; content:counter(step); position:absolute; left:0; top:-3px;
+                     width:32px; height:32px; border-radius:9px; background:var(--accent-soft); color:var(--accent);
+                     display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; }
+
+  @media (max-width:760px){
+    .nav-inner{ height:auto; flex-direction:column; align-items:flex-start; padding:12px 18px; gap:10px; }
+    .nav-links{ width:100%; }
+    .wrap{ padding:26px 18px 60px; }
+    .grid,.cols,.insights{ grid-template-columns:1fr; gap:20px; }
+    .topk{ margin-left:0; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <div class="nav-logo" data-page="getstarted">
+      <div class="mark" data-ic="funnel" data-sz="20"></div>
+      <div class="txt">AI Resume Screening<small>Enterprise Recruitment Suite</small></div>
+    </div>
+    <div class="nav-links" id="navLinks">
+      <a data-page="about">About</a>
+      <a data-page="getstarted">Get Started</a>
+      <a data-page="shortlisted">Shortlisted Candidates<span class="dot" id="navShortCount">0</span></a>
+      <a data-page="dashboard">Dashboard</a>
+    </div>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <!-- ================= GET STARTED ================= -->
+  <section id="page-getstarted" class="page active">
+    <p class="eyebrow">Workflow</p>
+    <h1>Bulk Resume Screening</h1>
+    <p class="sub">Select a folder of resumes and a job description, then analyze to rank every
+       resume by its match score. Nothing is saved — this is a standalone analysis.</p>
+
+    <div class="card">
+      <div class="grid">
+        <div>
+          <p class="sec">Step 1 · Resume folder</p>
+          <div class="drop" id="drop"></div>
+          <input type="file" id="folderInput" webkitdirectory multiple style="display:none">
+        </div>
+        <div>
+          <p class="sec">Step 2 · Job Description</p>
+          <div class="drop" id="jdDrop"></div>
+          <input type="file" id="jdFileInput" accept=".pdf,.docx,.txt,.md" multiple style="display:none">
+          <div id="jdFileMeta" style="font-size:12px; color:var(--muted); margin-top:8px"></div>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="go" disabled>Analyze</button>
+        <div id="pickInfo"></div>
+        <div class="topk">
+          <label for="topk">LLM shortlist (top-K)</label>
+          <span class="tip" tabindex="0" role="img" aria-label="Top N resumes are evaluated in depth by the LLM">
+            <span data-ic="info" data-sz="15" style="display:flex"></span>
+            <span class="tip-pop">Only the top-K resumes by similarity are evaluated in depth by the LLM. Higher = more thorough, but slower.</span>
+          </span>
+          <div class="stepper">
+            <button type="button" id="topkMinus" aria-label="Decrease top-K">−</button>
+            <input type="number" id="topk" value="20" min="1" aria-label="Top-K value">
+            <button type="button" id="topkPlus" aria-label="Increase top-K">+</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="status"></div>
+    <div class="bar" id="bar"><div></div></div>
+
+    <div class="card" id="resultsCard" style="display:none">
+      <h2 style="margin-bottom:16px">Ranked Candidates</h2>
+      <table>
+        <thead><tr>
+          <th>#</th><th>Candidate</th><th>Similarity</th><th>Score</th><th>Recommendation</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div id="pager" class="pager"></div>
+    </div>
+  </section>
+
+  <!-- ================= SHORTLISTED ================= -->
+  <section id="page-shortlisted" class="page">
+    <p class="eyebrow">Talent Pool</p>
+    <h1>Shortlisted Candidates</h1>
+    <p class="sub">Candidates selected during analysis, ranked by suitability. Each card explains
+       why they were shortlisted — matched skills, experience relevance, strengths and the overall
+       recommendation.</p>
+    <div id="shortlistedBody"></div>
+  </section>
+
+  <!-- ================= DASHBOARD ================= -->
+  <section id="page-dashboard" class="page">
+    <p class="eyebrow">Analytics</p>
+    <h1>Dashboard</h1>
+    <p class="sub">Processing statistics and screening insights for the latest analysis run.</p>
+    <div id="dashboardBody"></div>
+  </section>
+
+  <!-- ================= ABOUT ================= -->
+  <section id="page-about" class="page">
+    <p class="eyebrow">Overview</p>
+    <h1>About AI Resume Screening</h1>
+    <p class="sub">An enterprise-grade screening assistant that ranks large batches of resumes against
+       a job description using a two-stage AI pipeline — fast semantic shortlisting followed by a
+       detailed LLM evaluation — so recruiters spend their time on the strongest candidates.</p>
+
+    <div class="feat">
+      <div class="f"><div class="ico" data-ic="zap" data-sz="22"></div><h4>Two-Stage Pipeline</h4>
+        <p>Embedding-based similarity shortlists the most relevant resumes, then an LLM scores each one in depth.</p></div>
+      <div class="f"><div class="ico" data-ic="target" data-sz="22"></div><h4>Weighted Scoring</h4>
+        <p>Skills, experience, education, domain relevance and projects combine into one transparent 0–100 score.</p></div>
+      <div class="f"><div class="ico" data-ic="clipboard" data-sz="22"></div><h4>Explainable Results</h4>
+        <p>Every candidate comes with matched skills, gaps, strengths and a written recommendation.</p></div>
+      <div class="f"><div class="ico" data-ic="lock" data-sz="22"></div><h4>Private by Design</h4>
+        <p>Nothing is persisted — each screening is a standalone analysis run entirely on your infrastructure.</p></div>
+    </div>
+
+    <div class="card" style="margin-top:24px">
+      <h2>How it works</h2>
+      <ol class="steps">
+        <li>Open <b>Get Started</b> and select a folder of resumes plus one or more JD files.</li>
+        <li>Click <b>Analyze</b> — resumes are extracted, embedded and shortlisted by similarity.</li>
+        <li>The shortlist is evaluated by the LLM and ranked by overall match score.</li>
+        <li>Review ranked results, drill into <b>Shortlisted Candidates</b>, and track stats on the <b>Dashboard</b>.</li>
+      </ol>
+    </div>
+  </section>
+
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const EXTS = [".pdf", ".docx", ".txt", ".md"];
+let pickedFiles = [];
+let jdFiles = [];
+let pollTimer = null;
+
+// UI-only state (does not affect screening logic)
+let lastRun = null;                 // latest run payload from the API
+let uploadedCount = 0;              // resumes chosen at submit time
+const resumeFileMap = new Map();    // filename -> File, for preview/download
+const PAGE_SIZE = 10;               // ranked candidates shown per page
+let resultsPage = 1;                // current page in the Ranked Candidates table
+
+const SCORE_LABELS = {
+  skills_match: "Skills Match (40%)",
+  experience_match: "Experience (30%)",
+  education_certifications: "Education / Certs (10%)",
+  domain_relevance: "Domain Relevance (10%)",
+  projects_achievements: "Projects / Achievements (10%)",
+};
+
+/* ===================== ICONS (UI only) ===================== */
+const ICONS = {
+  funnel:    '<path d="M3 5h18l-7 8.2V20l-4 1.5v-8.3z"/>',
+  folder:    '<path d="M4 7a2 2 0 0 1 2-2h3.2a2 2 0 0 1 1.4.6L12 7h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/>',
+  file:      '<path d="M14 4H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9z"/><path d="M14 4v5h5"/>',
+  check:     '<path d="M20 7 10 17l-5-5"/>',
+  eye:       '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/>',
+  download:  '<path d="M12 4v10"/><path d="m8 11 4 4 4-4"/><path d="M5 19h14"/>',
+  documents: '<path d="M9 4h6l4 4v9a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M15 4v4h4"/><path d="M5 8v11a1 1 0 0 0 1 1h9"/>',
+  search:    '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/>',
+  star:      '<path d="M12 4.5l2.3 4.7 5.2.8-3.8 3.7.9 5.2-4.6-2.4-4.6 2.4.9-5.2L4.5 10l5.2-.8z"/>',
+  trending:  '<path d="M4 16l5-5 4 4 7-7"/><path d="M16 8h4v4"/>',
+  users:     '<path d="M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19"/><circle cx="10" cy="8" r="3.5"/><path d="M20 19v-1.5a3.5 3.5 0 0 0-2.6-3.4"/><path d="M15 4.6a3.5 3.5 0 0 1 0 6.8"/>',
+  barchart:  '<path d="M5 20V11"/><path d="M12 20V5"/><path d="M19 20v-6"/><path d="M3.5 20h17"/>',
+  zap:       '<path d="M13 3 5 13h6l-1 8 8-10h-6z"/>',
+  target:    '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>',
+  clipboard: '<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="M9 5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v1H9z"/><path d="m9.5 13 2 2 3.5-3.5"/>',
+  lock:      '<rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
+  info:      '<circle cx="12" cy="12" r="8.5"/><path d="M12 11.5v4.5"/><path d="M12 8h.01"/>',
+  arrow:     '<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>',
+};
+function ic(name, size = 18) {
+  return `<svg class="ic" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor"
+    stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ""}</svg>`;
+}
+
+// Render the inner content of a drop zone (title may contain trusted markup; filenames are pre-escaped)
+function setDrop(el, iconName, title, hint, picked = false) {
+  el.classList.toggle("haspick", picked);
+  el.innerHTML = `<span class="drop-ico">${ic(iconName, 22)}</span>
+    <span class="drop-title">${title}</span>
+    ${hint ? `<span class="drop-hint">${hint}</span>` : ""}`;
+}
+
+/* ===================== NAVIGATION (UI only) ===================== */
+function showPage(name) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  const pg = $("page-" + name);
+  if (pg) pg.classList.add("active");
+  document.querySelectorAll(".nav-links a").forEach(a =>
+    a.classList.toggle("active", a.dataset.page === name));
+  if (name === "shortlisted") renderShortlisted();
+  if (name === "dashboard") renderDashboard();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+document.querySelectorAll("[data-page]").forEach(el =>
+  el.addEventListener("click", () => showPage(el.dataset.page)));
+
+/* ===================== SCREENING LOGIC (unchanged) ===================== */
+// JD file upload
+$("jdDrop").onclick = () => $("jdFileInput").click();
+$("jdFileInput").addEventListener("change", () => {
+  const all = [...$("jdFileInput").files];
+  jdFiles = all.filter(f => EXTS.some(ext => f.name.toLowerCase().endsWith(ext)));
+  if (jdFiles.length) {
+    setDrop($("jdDrop"), "check", `<b>${jdFiles.length}</b> JD file(s) selected`, "Click to change", true);
+    $("jdFileMeta").innerHTML = jdFiles.map(f => `<div>${esc(f.name)}</div>`).join("");
+  } else {
+    setDrop($("jdDrop"), "file", "No PDF/DOCX/TXT/MD files selected", "Choose file(s)…");
+    $("jdFileMeta").innerHTML = "";
+  }
+  updateReady();
+});
+
+$("drop").onclick = () => $("folderInput").click();
+$("folderInput").addEventListener("change", () => {
+  const all = [...$("folderInput").files];
+  pickedFiles = all.filter(f => EXTS.some(ext => f.name.toLowerCase().endsWith(ext)));
+  // keep File handles so the Shortlisted page can preview / download resumes
+  resumeFileMap.clear();
+  pickedFiles.forEach(f => resumeFileMap.set(f.name, f));
+  const folder = all.length && all[0].webkitRelativePath
+    ? all[0].webkitRelativePath.split("/")[0] : "";
+  if (pickedFiles.length) {
+    setDrop($("drop"), "check", `<b>${pickedFiles.length}</b> resumes from <b>${esc(folder)}</b>`, "Click to change", true);
+  } else {
+    setDrop($("drop"), "folder", "No PDF/DOCX/TXT files in that folder", "Choose another…");
+  }
+  updateReady();
+});
+
+// top-K stepper (UI only — the value is still read from #topk by Analyze)
+function bumpTopK(delta) {
+  const inp = $("topk");
+  const min = parseInt(inp.min) || 1;
+  const cur = parseInt(inp.value) || min;
+  inp.value = Math.max(min, cur + delta);
+}
+$("topkMinus").onclick = () => bumpTopK(-1);
+$("topkPlus").onclick = () => bumpTopK(1);
+$("topk").addEventListener("input", () => {
+  const min = parseInt($("topk").min) || 1;
+  if ($("topk").value !== "" && parseInt($("topk").value) < min) $("topk").value = min;
+});
+
+function updateReady() {
+  const ready = pickedFiles.length && jdFiles.length > 0;
+  $("go").disabled = !ready;
+  if (ready) {
+    $("pickInfo").innerHTML = `Evaluating <b>${pickedFiles.length}</b> resumes against <b>${jdFiles.length} JD file(s)</b>`;
+  } else {
+    $("pickInfo").innerHTML = "";
+  }
+}
+
+$("go").onclick = async () => {
+  const fd = new FormData();
+  for (const f of jdFiles) fd.append("jd_files", f, f.name);
+  fd.append("top_k", parseInt($("topk").value) || 20);
+  for (const f of pickedFiles) fd.append("resumes", f, f.name);
+
+  uploadedCount = pickedFiles.length;
+  resultsPage = 1;                 // start a fresh result set on page 1
+  $("go").disabled = true;
+  $("status").textContent = `Uploading ${pickedFiles.length} resumes...`;
+  try {
+    const resp = await fetch("/api/screenings", { method: "POST", body: fd });
+    if (!resp.ok) throw new Error((await resp.json()).detail || resp.statusText);
+    const { run_id } = await resp.json();
+    poll(run_id);
+  } catch (e) {
+    $("status").innerHTML = `<span class="errtext">Error: ${esc(e.message)}</span>`;
+    updateReady();
+  }
+};
+
+function poll(runId) {
+  clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    const resp = await fetch(`/api/screenings/${runId}`);
+    if (!resp.ok) return;
+    const run = await resp.json();
+    render(run);
+    if (run.status === "complete" || run.status === "error") {
+      clearInterval(pollTimer);
+      updateReady();
+    }
+  }, 2000);
+}
+
+function render(run) {
+  const msgs = {
+    extracting: `Extracting text from ${run.total} files...`,
+    embedding: "Stage 1: computing embeddings & similarity shortlist...",
+    extracting_requirements: "Stage 2: extracting JD requirements with the LLM...",
+    evaluating: `Stage 2: LLM evaluating shortlist — ${run.evaluated}/${run.shortlisted} done`,
+    complete: `<span class="ok">${ic("check", 16)}</span> Complete — ${run.shortlisted} of ${run.total} resumes evaluated in depth`,
+    error: `<span class="errtext">Pipeline error: ${esc(run.error || "unknown")}</span>`,
+  };
+  $("status").innerHTML = msgs[run.status] || esc(run.status);
+  if (run.file_errors?.length)
+    $("status").innerHTML += `<br><span class="errtext">Skipped files: ${esc(run.file_errors.map(e => e.filename).join(", "))}</span>`;
+
+  $("bar").style.display = "block";
+  const pct = run.status === "complete" ? 100
+            : run.status === "evaluating" ? 25 + 75 * (run.evaluated / Math.max(1, run.shortlisted))
+            : run.status === "embedding" ? 15
+            : run.status === "extracting_requirements" ? 22 : 5;
+  $("bar").firstElementChild.style.width = pct + "%";
+
+  // share the run with the Shortlisted & Dashboard pages, then refresh them live
+  lastRun = run;
+  updateNavBadge();
+  if ($("page-shortlisted").classList.contains("active")) renderShortlisted();
+  if ($("page-dashboard").classList.contains("active")) renderDashboard();
+
+  if (!run.results.length) { $("pager").innerHTML = ""; return; }
+  $("resultsCard").style.display = "block";
+  const tbody = $("tbody");
+  const openKeys = new Set([...tbody.querySelectorAll("tr.detail.open")].map(r => r.dataset.key));
+  tbody.innerHTML = "";
+
+  // Pagination (UI only): show PAGE_SIZE candidates per page; full result set is kept intact.
+  const total = run.results.length;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  resultsPage = Math.min(Math.max(1, resultsPage), pages);
+  const start = (resultsPage - 1) * PAGE_SIZE;
+  const pageRows = run.results.slice(start, start + PAGE_SIZE);
+
+  pageRows.forEach((r, i) => {
+    const idx = start + i;                 // true rank across the whole result set
+    const badge = r.recommendation === "Strong Match" ? "strong"
+                : r.recommendation === "Good Match" ? "good"
+                : r.recommendation === "Weak Match" ? "weak" : "none";
+    const tr = document.createElement("tr");
+    tr.className = "main";
+    tr.innerHTML = `
+      <td><span class="rank ${idx < 3 ? "top" : ""}">${idx + 1}</span></td>
+      <td><strong>${esc(r.candidate_name)}</strong><br><small style="color:var(--muted)">${esc(r.filename)}</small></td>
+      <td>${(r.similarity * 100).toFixed(1)}%</td>
+      <td class="score">${r.overall_score ?? "—"}</td>
+      <td><span class="badge ${badge}">${r.recommendation || "Evaluating..."}</span></td>`;
+    const dt = document.createElement("tr");
+    dt.className = "detail";
+    dt.dataset.key = r.filename;
+    if (openKeys.has(r.filename)) dt.classList.add("open");
+    dt.innerHTML = `<td colspan="5">${detailHtml(r)}</td>`;
+    tr.onclick = () => dt.classList.toggle("open");
+    tbody.append(tr, dt);
+  });
+
+  renderPager(total, pages, start, pageRows.length);
+}
+
+function detailHtml(r) {
+  if (r.error) return `<span class="errtext">Evaluation failed: ${esc(r.error)}</span>`;
+  if (!r.scores) return `<em>No detailed evaluation (below similarity cutoff or still pending).</em>`;
+  const meters = Object.entries(SCORE_LABELS).map(([k, label]) => `
+    <div class="meter"><div class="label">${label}</div>
+      <div class="track"><div class="fill" style="width:${r.scores[k] || 0}%"></div></div>
+      <div class="val">${r.scores[k] ?? "—"}</div></div>`).join("");
+  const list = items => (items || []).map(s => `<li>${esc(s)}</li>`).join("") || "<li>—</li>";
+  const chips = (items, cls = "") => (items || []).map(s => `<span class="${cls}">${esc(s)}</span>`).join("") || "—";
+  return `
+    ${r.summary ? `<div class="summary">${esc(r.summary)}</div>` : ""}
+    <div class="cols">
+      <div>
+        ${meters}
+        <h4 style="margin-top:14px">Skills matched</h4><div class="chips">${chips(r.required_skills_matched)}</div>
+        <h4 style="margin-top:14px">Skills missing</h4><div class="chips">${chips(r.required_skills_missing, "miss")}</div>
+      </div>
+      <div>
+        <h4>Strengths</h4><ul>${list(r.strengths)}</ul>
+        <h4>Missing requirements</h4><ul>${list(r.missing_requirements)}</ul>
+        ${r.years_experience_estimate != null ? `<h4>Estimated experience</h4><p style="font-size:13px;margin:0;color:var(--text-2)">${esc(r.years_experience_estimate)} years</p>` : ""}
+      </div>
+    </div>`;
+}
+
+/* ===================== RANKED RESULTS PAGINATION (UI only) ===================== */
+function gotoPage(p) {
+  resultsPage = p;
+  if (lastRun) render(lastRun);
+}
+
+function renderPager(total, pages, start, count) {
+  const pager = $("pager");
+  if (pages <= 1) {
+    pager.innerHTML = `<span class="info">Showing all <b>${total}</b> candidate${total === 1 ? "" : "s"}</span>`;
+    return;
+  }
+  const from = start + 1, to = start + count;
+  const nums = pageWindow(resultsPage, pages).map(p =>
+    p === "…" ? `<span class="pg ellipsis">…</span>`
+              : `<button class="pg${p === resultsPage ? " active" : ""}" onclick="gotoPage(${p})">${p}</button>`
+  ).join("");
+  pager.innerHTML = `
+    <span class="info">Showing <b>${from}–${to}</b> of <b>${total}</b> candidates</span>
+    <div class="pager-ctrls">
+      <button onclick="gotoPage(${resultsPage - 1})" ${resultsPage === 1 ? "disabled" : ""}>‹ Previous</button>
+      ${nums}
+      <button onclick="gotoPage(${resultsPage + 1})" ${resultsPage === pages ? "disabled" : ""}>Next ›</button>
+    </div>`;
+}
+
+// Build a compact page list with ellipses, e.g. 1 … 4 5 [6] 7 8 … 20
+function pageWindow(current, pages) {
+  const out = [], win = 2;
+  const lo = Math.max(1, current - win), hi = Math.min(pages, current + win);
+  if (lo > 1) { out.push(1); if (lo > 2) out.push("…"); }
+  for (let p = lo; p <= hi; p++) out.push(p);
+  if (hi < pages) { if (hi < pages - 1) out.push("…"); out.push(pages); }
+  return out;
+}
+
+/* ===================== SHORTLISTED PAGE (UI only) ===================== */
+function shortlistedResults() {
+  if (!lastRun || !lastRun.results) return [];
+  // "shortlisted" = candidates the pipeline evaluated in depth, best score first
+  return lastRun.results.filter(r => r.shortlisted);
+}
+
+function updateNavBadge() {
+  $("navShortCount").textContent = shortlistedResults().length;
+}
+
+const badgeClass = rec => rec === "Strong Match" ? "strong"
+                        : rec === "Good Match" ? "good"
+                        : rec === "Weak Match" ? "weak" : "none";
+
+function renderShortlisted() {
+  const host = $("shortlistedBody");
+  const rows = shortlistedResults();
+  if (!rows.length) {
+    host.innerHTML = emptyState("users", "No shortlisted candidates yet",
+      "Run an analysis to see the candidates selected for in-depth evaluation here.");
+    return;
+  }
+  host.innerHTML = rows.map((r, idx) => candidateCard(r, idx + 1)).join("");
+  // wire preview / download buttons
+  host.querySelectorAll("[data-resume]").forEach(btn =>
+    btn.addEventListener("click", () => openResume(btn.dataset.resume, btn.dataset.dl === "1")));
+}
+
+function candidateCard(r, rank) {
+  const meters = Object.entries(SCORE_LABELS).map(([k, label]) => `
+    <div class="meter"><div class="label">${label}</div>
+      <div class="track"><div class="fill" style="width:${(r.scores && r.scores[k]) || 0}%"></div></div>
+      <div class="val">${(r.scores && r.scores[k] != null) ? r.scores[k] : "—"}</div></div>`).join("");
+  const list = items => (items || []).length
+    ? `<ul>${items.map(s => `<li>${esc(s)}</li>`).join("")}</ul>` : `<p style="color:var(--muted)">—</p>`;
+  const chips = (items, cls = "") => (items || []).length
+    ? `<div class="chips">${items.map(s => `<span class="${cls}">${esc(s)}</span>`).join("")}</div>`
+    : `<p style="color:var(--muted)">—</p>`;
+  const hasFile = resumeFileMap.has(r.filename);
+  const exp = r.years_experience_estimate != null
+    ? `${esc(r.years_experience_estimate)} years of relevant experience`
+    : "Experience level not specified";
+  const expScore = (r.scores && r.scores.experience_match != null) ? `${r.scores.experience_match}/100` : "—";
+
+  if (r.error) {
+    return `<div class="cand"><div class="cand-head">
+      <div class="cand-rank">${rank}</div>
+      <div class="cand-id"><div class="nm">${esc(r.candidate_name)}</div><div class="fn">${esc(r.filename)}</div></div>
+      </div><div class="cand-body"><span class="errtext">Evaluation failed: ${esc(r.error)}</span></div></div>`;
+  }
+
+  return `
+  <div class="cand">
+    <div class="cand-head">
+      <div class="cand-rank">${rank}</div>
+      <div class="cand-id">
+        <div class="nm">${esc(r.candidate_name)}</div>
+        <div class="fn">${esc(r.filename)} &nbsp;·&nbsp; ${(r.similarity * 100).toFixed(1)}% similarity</div>
+      </div>
+      <div class="cand-score">
+        <div class="v">${r.overall_score ?? "—"}</div>
+        <div class="l">Match Score</div>
+      </div>
+      <div><span class="badge ${badgeClass(r.recommendation)}">${esc(r.recommendation || "Pending")}</span></div>
+      <div class="cand-actions">
+        <button class="btn-sm primary" data-resume="${esc(r.filename)}" data-dl="0" ${hasFile ? "" : "disabled"}>${ic("eye", 15)} Preview</button>
+        <button class="btn-sm" data-resume="${esc(r.filename)}" data-dl="1" ${hasFile ? "" : "disabled"}>${ic("download", 15)} Download</button>
+      </div>
+    </div>
+    <div class="cand-body">
+      <div class="blk">
+        <h4>Why this candidate was selected</h4>
+        <p>${esc(r.summary || "Selected as a top match based on overall fit against the job description.")}</p>
+      </div>
+      <div class="cols">
+        <div>
+          <div class="blk"><h4>Score breakdown</h4>${meters}</div>
+          <div class="blk"><h4>Skills matched with the JD</h4>${chips(r.required_skills_matched)}</div>
+          <div class="blk"><h4>Skills still missing</h4>${chips(r.required_skills_missing, "miss")}</div>
+          ${(r.preferred_skills_matched || []).length ? `<div class="blk"><h4>Preferred skills matched</h4>${chips(r.preferred_skills_matched)}</div>` : ""}
+        </div>
+        <div>
+          <div class="blk"><h4>Experience relevance</h4><p>${exp} &nbsp;·&nbsp; experience match ${expScore}.</p></div>
+          <div class="blk"><h4>Strengths &amp; key achievements</h4>${list(r.strengths)}</div>
+          <div class="blk"><h4>Gaps / missing requirements</h4>${list(r.missing_requirements)}</div>
+          <div class="blk"><h4>Overall recommendation</h4>
+            <p><span class="badge ${badgeClass(r.recommendation)}">${esc(r.recommendation || "Pending")}</span></p></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function openResume(filename, download) {
+  const f = resumeFileMap.get(filename);
+  if (!f) return;
+  const url = URL.createObjectURL(f);
+  if (download) {
+    const a = document.createElement("a");
+    a.href = url; a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
+  } else {
+    window.open(url, "_blank");
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+/* ===================== DASHBOARD PAGE (UI only) ===================== */
+function renderDashboard() {
+  const host = $("dashboardBody");
+  if (!lastRun) {
+    host.innerHTML = emptyState("barchart", "No analysis yet",
+      "Run a screening from the Get Started page to populate dashboard statistics and insights.");
+    return;
+  }
+  const run = lastRun;
+  const results = run.results || [];
+  const scored = results.filter(r => typeof r.overall_score === "number");
+  const avg = scored.length ? Math.round(scored.reduce((a, r) => a + r.overall_score, 0) / scored.length) : null;
+  const topScore = scored.length ? Math.max(...scored.map(r => r.overall_score)) : null;
+
+  const rec = { strong: 0, good: 0, weak: 0, other: 0 };
+  results.forEach(r => {
+    if (r.recommendation === "Strong Match") rec.strong++;
+    else if (r.recommendation === "Good Match") rec.good++;
+    else if (r.recommendation === "Weak Match") rec.weak++;
+    else if (r.shortlisted) rec.other++;
+  });
+  const recTotal = rec.strong + rec.good + rec.weak + rec.other || 1;
+
+  const uploaded = uploadedCount || run.total || 0;
+  const analyzed = run.total || 0;
+  const shortlisted = run.shortlisted || 0;
+  const evaluated = run.evaluated || 0;
+  const skipped = (run.file_errors || []).length;
+  const statusLabel = { complete: "Complete", error: "Error", evaluating: "Evaluating",
+    embedding: "Embedding", extracting: "Extracting", extracting_requirements: "Reading JD" }[run.status] || run.status;
+
+  const stat = (icon, cls, num, lbl) =>
+    `<div class="stat"><div class="ico ${cls}">${icon}</div><div class="num">${num}</div><div class="lbl">${lbl}</div></div>`;
+
+  const seg = (n, color, label) => n
+    ? `<div style="width:${(n / recTotal * 100).toFixed(1)}%;background:${color}" title="${label}: ${n}"></div>` : "";
+
+  host.innerHTML = `
+    <div class="stats">
+      ${stat(ic("documents", 20), "i-blue", uploaded, "Total Resumes Uploaded")}
+      ${stat(ic("search", 20), "i-cyan", analyzed, "Total Resumes Analyzed")}
+      ${stat(ic("star", 20), "i-violet", shortlisted, "Shortlisted Candidates")}
+      ${stat(ic("trending", 20), "i-green", avg != null ? avg : "—", "Average Candidate Score")}
+    </div>
+
+    <div class="insights">
+      <div class="card">
+        <h2>Recommendation breakdown</h2>
+        <div class="recbar">
+          ${seg(rec.strong, "#15803d", "Strong")}
+          ${seg(rec.good, "#b45309", "Good")}
+          ${seg(rec.weak, "#b91c1c", "Weak")}
+          ${seg(rec.other, "#94a3b8", "Other")}
+        </div>
+        <div class="leg">
+          <span><span class="dotmark" style="background:#15803d"></span>Strong <b>${rec.strong}</b></span>
+          <span><span class="dotmark" style="background:#b45309"></span>Good <b>${rec.good}</b></span>
+          <span><span class="dotmark" style="background:#b91c1c"></span>Weak <b>${rec.weak}</b></span>
+          <span><span class="dotmark" style="background:#94a3b8"></span>Other <b>${rec.other}</b></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Processing statistics</h2>
+        <table>
+          <tr><td>Pipeline status</td><td style="text-align:right"><b>${esc(statusLabel)}</b></td></tr>
+          <tr><td>Resumes uploaded</td><td style="text-align:right"><b>${uploaded}</b></td></tr>
+          <tr><td>Readable &amp; analyzed</td><td style="text-align:right"><b>${analyzed}</b></td></tr>
+          <tr><td>Shortlisted for deep evaluation</td><td style="text-align:right"><b>${shortlisted}</b></td></tr>
+          <tr><td>Evaluations completed</td><td style="text-align:right"><b>${evaluated}</b></td></tr>
+          <tr><td>Highest score</td><td style="text-align:right"><b>${topScore != null ? topScore : "—"}</b></td></tr>
+          <tr><td>Files skipped (unreadable)</td><td style="text-align:right"><b>${skipped}</b></td></tr>
+          <tr><td>Job description</td><td style="text-align:right"><b>${esc(run.jd_name || "—")}</b></td></tr>
+        </table>
+      </div>
+    </div>
+
+    ${skipped ? `<div class="card"><h2>Skipped files</h2><p class="errtext">${esc(run.file_errors.map(e => e.filename).join(", "))}</p></div>` : ""}
+  `;
+}
+
+/* ===================== SHARED HELPERS ===================== */
+function emptyState(iconName, title, msg) {
+  return `<div class="empty">
+    <div class="empty-ico">${ic(iconName, 30)}</div>
+    <h3>${esc(title)}</h3>
+    <p>${esc(msg)}</p>
+    <button onclick="showPage('getstarted')">Go to Get Started ${ic("arrow", 16)}</button>
+  </div>`;
+}
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+/* ===================== INITIAL PAINT ===================== */
+// fill all static [data-ic] placeholders (logo, tooltip, feature tiles)
+document.querySelectorAll("[data-ic]").forEach(el => el.innerHTML = ic(el.dataset.ic, +el.dataset.sz || 18));
+// initial drop-zone content
+setDrop($("drop"), "folder", "Choose a resume folder", "A folder of PDF / DOCX / TXT / MD files");
+setDrop($("jdDrop"), "file", "Choose JD file(s)", "PDF, DOCX, TXT or MD");
+updateNavBadge();
+renderShortlisted();
+renderDashboard();
+</script>
+</body>
+</html>

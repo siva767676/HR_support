@@ -1,0 +1,12 @@
+Candidate NURSE
+Registered Nurse
+
+Summary: 5+ years of experience in acute patient care.
+Skills: Patient Care, Triage, EHR, Medication Administration.
+
+Experience:
+- Built and shipped acute patient care using Patient Care, Triage, EHR.
+- Owned features end to end; they led design, implementation and deployment.
+- Worked with Medication Administration to deliver reliable, well-tested systems.
+
+Education: B.S., Nursing, Health Institute.

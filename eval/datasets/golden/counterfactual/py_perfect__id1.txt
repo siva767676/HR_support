@@ -1,0 +1,12 @@
+Aisha Khan
+Python Backend Engineer
+
+Summary: 7+ years of experience in backend web services.
+Skills: Python, FastAPI, PostgreSQL, Docker, REST APIs, Kubernetes, AWS, Redis, CI/CD.
+
+Experience:
+- Built and shipped backend web services using Python, FastAPI, PostgreSQL.
+- Owned features end to end; she led design, implementation and deployment.
+- Worked with Docker, REST APIs, Kubernetes, AWS, Redis, CI/CD to deliver reliable, well-tested systems.
+
+Education: B.S., Women's Engineering College.

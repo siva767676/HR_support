@@ -1,0 +1,23 @@
+{
+  "ok": true,
+  "latency_s": 20.35,
+  "overall_score": 100.0,
+  "recommendation": "Strong Match",
+  "scores": {
+    "skills_match": 100,
+    "experience_match": 100,
+    "education_certifications": 100,
+    "domain_relevance": 100,
+    "projects_achievements": 100
+  },
+  "required_skills_matched": [
+    "Python",
+    "FastAPI",
+    "PostgreSQL",
+    "Docker",
+    "REST APIs"
+  ],
+  "required_skills_missing": [],
+  "candidate_name": "PY_STRONG",
+  "years_experience_estimate": 5
+}

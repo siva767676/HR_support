@@ -1,0 +1,12 @@
+Candidate ACCOUNTANT
+Senior Accountant
+
+Summary: 8+ years of experience in financial accounting and audit.
+Skills: GAAP, Excel, QuickBooks, Tax Preparation, Auditing.
+
+Experience:
+- Built and shipped financial accounting and audit using GAAP, Excel, QuickBooks.
+- Owned features end to end; they led design, implementation and deployment.
+- Worked with Tax Preparation, Auditing to deliver reliable, well-tested systems.
+
+Education: B.S., Accounting, City College.

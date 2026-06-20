@@ -1,0 +1,25 @@
+{
+  "ok": true,
+  "latency_s": 19.38,
+  "overall_score": 50.0,
+  "recommendation": "Weak Match",
+  "scores": {
+    "skills_match": 40,
+    "experience_match": 30,
+    "education_certifications": 100,
+    "domain_relevance": 100,
+    "projects_achievements": 50,
+    "average_score": 56
+  },
+  "required_skills_matched": [
+    "React",
+    "TypeScript"
+  ],
+  "required_skills_missing": [
+    "JavaScript",
+    "CSS",
+    "HTML"
+  ],
+  "candidate_name": "FE_WEAK",
+  "years_experience_estimate": 2
+}

@@ -1,0 +1,8 @@
+Job Title: Senior Frontend Engineer (React)
+Domain: frontend web applications
+Minimum experience: 4+ years
+
+Required skills: React, TypeScript, JavaScript, CSS, HTML.
+Preferred skills: Redux, Next.js, Jest, Webpack.
+
+Responsibilities: design, build and operate production systems; collaborate across teams; write tested, maintainable code; own features end to end from design through deployment and monitoring.

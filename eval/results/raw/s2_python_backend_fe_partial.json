@@ -1,0 +1,25 @@
+{
+  "ok": true,
+  "latency_s": 16.07,
+  "overall_score": 17.0,
+  "recommendation": "Weak Match",
+  "scores": {
+    "skills_match": 0,
+    "experience_match": 0,
+    "experience_match_score": 0,
+    "education_certifications": 100,
+    "domain_relevance": 20,
+    "projects_achievements": 50,
+    "overall_score": 0
+  },
+  "required_skills_matched": [],
+  "required_skills_missing": [
+    "Python",
+    "FastAPI",
+    "PostgreSQL",
+    "Docker",
+    "REST APIs"
+  ],
+  "candidate_name": "FE_PARTIAL",
+  "years_experience_estimate": 3
+}

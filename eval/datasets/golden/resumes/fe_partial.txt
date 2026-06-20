@@ -1,0 +1,12 @@
+Candidate FE_PARTIAL
+Frontend Engineer
+
+Summary: 3+ years of experience in frontend web applications.
+Skills: React, TypeScript, JavaScript.
+
+Experience:
+- Built and shipped frontend web applications using React, TypeScript, JavaScript.
+- Owned features end to end; they led design, implementation and deployment.
+- Worked with cross-functional teams to deliver reliable, well-tested systems.
+
+Education: B.S., Computer Science, Tech University.

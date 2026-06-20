@@ -1,0 +1,12 @@
+Candidate PY_STRONG
+Python Backend Engineer
+
+Summary: 5+ years of experience in backend web services.
+Skills: Python, FastAPI, PostgreSQL, Docker, REST APIs, Kubernetes, AWS.
+
+Experience:
+- Built and shipped backend web services using Python, FastAPI, PostgreSQL.
+- Owned features end to end; they led design, implementation and deployment.
+- Worked with Docker, REST APIs, Kubernetes, AWS to deliver reliable, well-tested systems.
+
+Education: B.S., Computer Science, Tech University.

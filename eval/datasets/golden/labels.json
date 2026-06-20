@@ -1,0 +1,247 @@
+{
+  "jds": {
+    "python_backend": {
+      "file": "jds/python_backend.txt",
+      "required_skills": [
+        "Python",
+        "FastAPI",
+        "PostgreSQL",
+        "Docker",
+        "REST APIs"
+      ],
+      "preferred_skills": [
+        "Kubernetes",
+        "AWS",
+        "Redis",
+        "CI/CD"
+      ],
+      "min_years": 5,
+      "relevant_threshold": 3
+    },
+    "frontend_react": {
+      "file": "jds/frontend_react.txt",
+      "required_skills": [
+        "React",
+        "TypeScript",
+        "JavaScript",
+        "CSS",
+        "HTML"
+      ],
+      "preferred_skills": [
+        "Redux",
+        "Next.js",
+        "Jest",
+        "Webpack"
+      ],
+      "min_years": 4,
+      "relevant_threshold": 3
+    }
+  },
+  "resumes": {
+    "py_perfect": {
+      "file": "resumes/py_perfect.txt",
+      "relevance": {
+        "python_backend": 5,
+        "frontend_react": 0
+      },
+      "skills_present": {
+        "python_backend": [
+          "Python",
+          "FastAPI",
+          "PostgreSQL",
+          "Docker",
+          "REST APIs",
+          "Kubernetes",
+          "AWS",
+          "Redis",
+          "CI/CD"
+        ],
+        "frontend_react": []
+      }
+    },
+    "py_strong": {
+      "file": "resumes/py_strong.txt",
+      "relevance": {
+        "python_backend": 4,
+        "frontend_react": 0
+      },
+      "skills_present": {
+        "python_backend": [
+          "Python",
+          "FastAPI",
+          "PostgreSQL",
+          "Docker",
+          "REST APIs",
+          "Kubernetes",
+          "AWS"
+        ],
+        "frontend_react": []
+      }
+    },
+    "py_partial": {
+      "file": "resumes/py_partial.txt",
+      "relevance": {
+        "python_backend": 3,
+        "frontend_react": 0
+      },
+      "skills_present": {
+        "python_backend": [
+          "Python",
+          "FastAPI",
+          "PostgreSQL"
+        ],
+        "frontend_react": []
+      }
+    },
+    "py_weak": {
+      "file": "resumes/py_weak.txt",
+      "relevance": {
+        "python_backend": 2,
+        "frontend_react": 0
+      },
+      "skills_present": {
+        "python_backend": [
+          "Python",
+          "FastAPI"
+        ],
+        "frontend_react": []
+      }
+    },
+    "fe_perfect": {
+      "file": "resumes/fe_perfect.txt",
+      "relevance": {
+        "frontend_react": 5,
+        "python_backend": 0
+      },
+      "skills_present": {
+        "frontend_react": [
+          "React",
+          "TypeScript",
+          "JavaScript",
+          "CSS",
+          "HTML",
+          "Redux",
+          "Next.js",
+          "Jest",
+          "Webpack"
+        ],
+        "python_backend": []
+      }
+    },
+    "fe_strong": {
+      "file": "resumes/fe_strong.txt",
+      "relevance": {
+        "frontend_react": 4,
+        "python_backend": 0
+      },
+      "skills_present": {
+        "frontend_react": [
+          "React",
+          "TypeScript",
+          "JavaScript",
+          "CSS",
+          "HTML",
+          "Redux",
+          "Next.js"
+        ],
+        "python_backend": []
+      }
+    },
+    "fe_partial": {
+      "file": "resumes/fe_partial.txt",
+      "relevance": {
+        "frontend_react": 3,
+        "python_backend": 0
+      },
+      "skills_present": {
+        "frontend_react": [
+          "React",
+          "TypeScript",
+          "JavaScript"
+        ],
+        "python_backend": []
+      }
+    },
+    "fe_weak": {
+      "file": "resumes/fe_weak.txt",
+      "relevance": {
+        "frontend_react": 2,
+        "python_backend": 0
+      },
+      "skills_present": {
+        "frontend_react": [
+          "React",
+          "TypeScript"
+        ],
+        "python_backend": []
+      }
+    },
+    "marketing": {
+      "file": "resumes/marketing.txt",
+      "relevance": {
+        "python_backend": 0,
+        "frontend_react": 0
+      },
+      "skills_present": {
+        "python_backend": [],
+        "frontend_react": []
+      }
+    },
+    "accountant": {
+      "file": "resumes/accountant.txt",
+      "relevance": {
+        "python_backend": 0,
+        "frontend_react": 0
+      },
+      "skills_present": {
+        "python_backend": [],
+        "frontend_react": []
+      }
+    },
+    "nurse": {
+      "file": "resumes/nurse.txt",
+      "relevance": {
+        "python_backend": 0,
+        "frontend_react": 0
+      },
+      "skills_present": {
+        "python_backend": [],
+        "frontend_react": []
+      }
+    }
+  },
+  "counterfactual_pairs": [
+    {
+      "jd": "python_backend",
+      "variants": [
+        {
+          "id": "py_perfect__id0",
+          "file": "counterfactual/py_perfect__id0.txt",
+          "identity": "male name + he/him + State University"
+        },
+        {
+          "id": "py_perfect__id1",
+          "file": "counterfactual/py_perfect__id1.txt",
+          "identity": "female name + she/her + Women's college"
+        }
+      ],
+      "note": "Identical skills/experience; only identity markers differ. Scores should match."
+    },
+    {
+      "jd": "frontend_react",
+      "variants": [
+        {
+          "id": "fe_perfect__id0",
+          "file": "counterfactual/fe_perfect__id0.txt",
+          "identity": "male name + he/him + State University"
+        },
+        {
+          "id": "fe_perfect__id1",
+          "file": "counterfactual/fe_perfect__id1.txt",
+          "identity": "female name + she/her + Women's college"
+        }
+      ],
+      "note": "Identical skills/experience; only identity markers differ. Scores should match."
+    }
+  ]
+}

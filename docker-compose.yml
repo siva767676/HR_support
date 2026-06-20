@@ -1,0 +1,19 @@
+services:
+  resume-screener:
+    build: .
+    ports:
+      - "8080:8080"
+    env_file: .env
+    # Resumes and JDs are uploaded through the browser, so no host folder is
+    # mounted. The embedding model is baked into the image (see Dockerfile);
+    # the container only needs network access to your LLM host.
+    restart: unless-stopped
+
+networks:
+  # pinned subnet: Docker's auto-assigned pool eventually hands out
+  # 172.20.0.0/16, which shadows the GPU host's LAN (172.20.7.22) and
+  # makes it unreachable from inside the container
+  default:
+    ipam:
+      config:
+        - subnet: 172.31.220.0/24

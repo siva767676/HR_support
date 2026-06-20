@@ -1,0 +1,25 @@
+{
+  "ok": true,
+  "latency_s": 15.8,
+  "overall_score": 49.0,
+  "recommendation": "Weak Match",
+  "scores": {
+    "skills_match": 30,
+    "experience_match": 40,
+    "experience_match_score": 40,
+    "education_certifications": 100,
+    "domain_relevance": 100,
+    "projects_achievements": 50
+  },
+  "required_skills_matched": [
+    "Python",
+    "FastAPI"
+  ],
+  "required_skills_missing": [
+    "PostgreSQL",
+    "Docker",
+    "REST APIs"
+  ],
+  "candidate_name": "PY_WEAK",
+  "years_experience_estimate": 2
+}

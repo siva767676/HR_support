@@ -1,0 +1,12 @@
+Candidate PY_WEAK
+Python Backend Engineer
+
+Summary: 2+ years of experience in backend web services.
+Skills: Python, FastAPI.
+
+Experience:
+- Built and shipped backend web services using Python, FastAPI.
+- Owned features end to end; they led design, implementation and deployment.
+- Worked with cross-functional teams to deliver reliable, well-tested systems.
+
+Education: B.S., Computer Science, Tech University.

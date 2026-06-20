@@ -1,0 +1,26 @@
+{
+  "ok": true,
+  "latency_s": 19.78,
+  "overall_score": 61.0,
+  "recommendation": "Good Match",
+  "scores": {
+    "skills_match": 40,
+    "experience_match": 60,
+    "experience_years": 0,
+    "education_certifications": 100,
+    "domain_relevance": 100,
+    "projects_achievements": 70,
+    "overall_score": 45
+  },
+  "required_skills_matched": [
+    "React",
+    "TypeScript",
+    "JavaScript"
+  ],
+  "required_skills_missing": [
+    "CSS",
+    "HTML"
+  ],
+  "candidate_name": "FE_PARTIAL",
+  "years_experience_estimate": 3
+}

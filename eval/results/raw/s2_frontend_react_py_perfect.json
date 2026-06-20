@@ -1,0 +1,24 @@
+{
+  "ok": true,
+  "latency_s": 14.97,
+  "overall_score": 30.0,
+  "recommendation": "Weak Match",
+  "scores": {
+    "skills_match": 0,
+    "experience_match": 50,
+    "education_certifications": 100,
+    "domain_relevance": 0,
+    "projects_achievements": 50
+  },
+  "required_skills_matched": [],
+  "required_skills_missing": [
+    "React",
+    "TypeScript",
+    "TypeScript",
+    "JavaScript",
+    "CSS",
+    "HTML"
+  ],
+  "candidate_name": "PY_PERFECT",
+  "years_experience_estimate": 7
+}

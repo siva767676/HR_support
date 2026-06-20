@@ -1,0 +1,12 @@
+Candidate FE_WEAK
+Frontend Engineer
+
+Summary: 2+ years of experience in frontend web applications.
+Skills: React, TypeScript.
+
+Experience:
+- Built and shipped frontend web applications using React, TypeScript.
+- Owned features end to end; they led design, implementation and deployment.
+- Worked with cross-functional teams to deliver reliable, well-tested systems.
+
+Education: B.S., Computer Science, Tech University.

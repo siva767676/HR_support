@@ -1,0 +1,12 @@
+Candidate FE_PERFECT
+Frontend Engineer
+
+Summary: 7+ years of experience in frontend web applications.
+Skills: React, TypeScript, JavaScript, CSS, HTML, Redux, Next.js, Jest, Webpack.
+
+Experience:
+- Built and shipped frontend web applications using React, TypeScript, JavaScript.
+- Owned features end to end; they led design, implementation and deployment.
+- Worked with CSS, HTML, Redux, Next.js, Jest, Webpack to deliver reliable, well-tested systems.
+
+Education: B.S., Computer Science, Tech University.

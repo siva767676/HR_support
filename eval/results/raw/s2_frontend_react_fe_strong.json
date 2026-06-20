@@ -1,0 +1,23 @@
+{
+  "ok": true,
+  "latency_s": 19.9,
+  "overall_score": 98.0,
+  "recommendation": "Strong Match",
+  "scores": {
+    "skills_match": 100,
+    "experience_match": 100,
+    "education_certifications": 100,
+    "domain_relevance": 100,
+    "projects_achievements": 80
+  },
+  "required_skills_matched": [
+    "React",
+    "TypeScript",
+    "JavaScript",
+    "CSS",
+    "HTML"
+  ],
+  "required_skills_missing": [],
+  "candidate_name": "FE_STRONG",
+  "years_experience_estimate": 5
+}

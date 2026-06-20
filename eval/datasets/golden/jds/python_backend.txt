@@ -1,0 +1,8 @@
+Job Title: Senior Python Backend Engineer
+Domain: backend web services
+Minimum experience: 5+ years
+
+Required skills: Python, FastAPI, PostgreSQL, Docker, REST APIs.
+Preferred skills: Kubernetes, AWS, Redis, CI/CD.
+
+Responsibilities: design, build and operate production systems; collaborate across teams; write tested, maintainable code; own features end to end from design through deployment and monitoring.

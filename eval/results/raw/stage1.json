@@ -1,0 +1,132 @@
+{
+  "python_backend": {
+    "ranking": [
+      {
+        "id": "py_perfect",
+        "similarity": 0.8465
+      },
+      {
+        "id": "py_strong",
+        "similarity": 0.8178
+      },
+      {
+        "id": "py_partial",
+        "similarity": 0.8156
+      },
+      {
+        "id": "py_weak",
+        "similarity": 0.7516
+      },
+      {
+        "id": "fe_partial",
+        "similarity": 0.5649
+      },
+      {
+        "id": "fe_strong",
+        "similarity": 0.5378
+      },
+      {
+        "id": "fe_weak",
+        "similarity": 0.5364
+      },
+      {
+        "id": "fe_perfect",
+        "similarity": 0.5276
+      },
+      {
+        "id": "accountant",
+        "similarity": 0.3472
+      },
+      {
+        "id": "marketing",
+        "similarity": 0.3113
+      },
+      {
+        "id": "nurse",
+        "similarity": 0.3096
+      }
+    ],
+    "relevant": [
+      "py_perfect",
+      "py_strong",
+      "py_partial"
+    ],
+    "recall_at": {
+      "2": 0.6666666666666666,
+      "3": 1.0,
+      "5": 1.0,
+      "8": 1.0
+    },
+    "precision_at": {
+      "3": 1.0,
+      "5": 0.6
+    },
+    "ndcg": 1.0,
+    "rank_of_best": 1
+  },
+  "frontend_react": {
+    "ranking": [
+      {
+        "id": "fe_partial",
+        "similarity": 0.8081
+      },
+      {
+        "id": "fe_strong",
+        "similarity": 0.7585
+      },
+      {
+        "id": "fe_perfect",
+        "similarity": 0.756
+      },
+      {
+        "id": "fe_weak",
+        "similarity": 0.75
+      },
+      {
+        "id": "py_partial",
+        "similarity": 0.4956
+      },
+      {
+        "id": "py_perfect",
+        "similarity": 0.4905
+      },
+      {
+        "id": "py_strong",
+        "similarity": 0.4541
+      },
+      {
+        "id": "py_weak",
+        "similarity": 0.4416
+      },
+      {
+        "id": "accountant",
+        "similarity": 0.324
+      },
+      {
+        "id": "marketing",
+        "similarity": 0.3021
+      },
+      {
+        "id": "nurse",
+        "similarity": 0.2945
+      }
+    ],
+    "relevant": [
+      "fe_perfect",
+      "fe_strong",
+      "fe_partial"
+    ],
+    "recall_at": {
+      "2": 0.6666666666666666,
+      "3": 1.0,
+      "5": 1.0,
+      "8": 1.0
+    },
+    "precision_at": {
+      "3": 1.0,
+      "5": 0.6
+    },
+    "ndcg": 0.8988373593227149,
+    "rank_of_best": 3
+  }
+}
