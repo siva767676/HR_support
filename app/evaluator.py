@@ -13,6 +13,13 @@ logger = logging.getLogger(__name__)
 # (401/404/422 …) signal a real misconfiguration that a retry won't fix.
 _RETRYABLE_STATUS = {408, 425, 429, 500, 502, 503, 504}
 
+
+def _auth_headers() -> dict:
+    """Authorization header only when an API key is configured. vLLM usually
+    needs no auth, and sending an empty Bearer token upsets some servers."""
+    key = config.VLLM_API_KEY
+    return {"Authorization": f"Bearer {key}"} if key else {}
+
 _JD_PROMPT = """You are an expert technical recruiter. Extract the key requirements from the job description below.
 
 Return ONLY a JSON object with these keys:
@@ -30,8 +37,9 @@ Job description:
 {jd}
 ---"""
 
-_EVAL_PROMPT = """You are a technical recruiter. Evaluate this resume against the job requirements.
-Base all assessments on resume evidence only. Be strict: missing required skills → score below 50.
+_EVAL_PROMPT = """You are a technical recruiter and CV analyst. Evaluate this resume against the job
+requirements AND extract a structured candidate profile. Base everything on resume evidence only.
+Be strict: missing required skills → score below 50.
 
 Requirements:
 {requirements}
@@ -44,15 +52,23 @@ Resume:
 Return only JSON:
 {{
   "candidate_name": "string or null",
+  "candidate_email": "string or null",
   "scores": {{"skills_match": 0-100, "experience_match": 0-100, "education_certifications": 0-100, "domain_relevance": 0-100, "projects_achievements": 0-100}},
   "required_skills_matched": ["skill1", "skill2"],
   "required_skills_missing": ["skill1", "skill2"],
   "preferred_skills_matched": ["skill1"],
   "years_experience_estimate": "number or null",
+  "education": ["degree, institution, year"],
+  "experience": ["Job title at Company (dates) — one line"],
+  "projects": ["short project description"],
+  "certifications": ["certification name"],
+  "achievements": ["notable achievement"],
   "strengths": ["point1", "point2", "point3"],
   "missing_requirements": ["gap1", "gap2"],
-  "summary": "one sentence assessment"
-}}"""
+  "summary": "one or two sentence overall assessment"
+}}
+Extract candidate_email and the education/experience/projects/certifications/achievements arrays
+from the resume; use [] when a section is absent and null for a missing email."""
 
 
 async def extract_jd_requirements(jd_text: str) -> dict:
@@ -105,15 +121,23 @@ Resumes:
 Return ONLY a JSON array with one evaluation object per resume, in the same order. Each object:
 {{
   "candidate_name": "string or null",
+  "candidate_email": "string or null",
   "scores": {{"skills_match": 0-100, "experience_match": 0-100, "education_certifications": 0-100, "domain_relevance": 0-100, "projects_achievements": 0-100}},
   "required_skills_matched": ["skill1"],
   "required_skills_missing": ["skill1"],
   "preferred_skills_matched": ["skill1"],
   "years_experience_estimate": "number or null",
+  "education": ["degree, institution, year"],
+  "experience": ["Job title at Company (dates) — one line"],
+  "projects": ["short project description"],
+  "certifications": ["certification name"],
+  "achievements": ["notable achievement"],
   "strengths": ["point1", "point2"],
   "missing_requirements": ["gap1"],
   "summary": "one sentence assessment"
-}}"""
+}}
+Extract candidate_email and the education/experience/projects/certifications/achievements arrays
+from each resume; use [] when absent and null for a missing email."""
 
     # A single garbled/truncated array would otherwise doom the whole batch (the
     # array parser has no repair). On any failure OR a count mismatch, fall back
@@ -154,7 +178,7 @@ async def _eval_individually(
 
 async def _chat_json_array(prompt: str) -> list[dict]:
     """Call LLM expecting a JSON array response."""
-    headers = {"Authorization": f"Bearer {config.VLLM_API_KEY}"}
+    headers = _auth_headers()
     max_tokens = config.MAX_OUTPUT_TOKENS
     last_error = "no attempts made"
 
@@ -200,7 +224,7 @@ async def _chat_json(prompt: str) -> dict:
     and a truncated response (hit the token ceiling) grows the budget before
     retrying. Only the final failure is propagated to the caller.
     """
-    headers = {"Authorization": f"Bearer {config.VLLM_API_KEY}"}
+    headers = _auth_headers()
     max_tokens = config.MAX_OUTPUT_TOKENS
     last_error = "no attempts made"
 
@@ -240,31 +264,71 @@ async def _chat_json(prompt: str) -> dict:
     )
 
 
-async def _request_content(prompt: str, headers: dict, max_tokens: int) -> tuple[str, bool]:
-    """Return (content, truncated) from one chat-completion call."""
+async def _request_content(
+    prompt: str, headers: dict, max_tokens: int, json_mode: bool = True
+) -> tuple[str, bool]:
+    """Return (content, truncated) from one chat-completion call.
+
+    json_mode=True asks the server for a JSON object (with a plain-completion
+    fallback on 400). json_mode=False is for free-text generation (e.g. JDs)."""
     payload = {
         "model": config.VLLM_MODEL,
         "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.1,
+        "temperature": config.VLLM_TEMPERATURE,
         "max_tokens": max_tokens,
     }
+    url = f"{config.VLLM_BASE_URL}/chat/completions"
     # generous timeout: Ollama/vLLM may queue concurrent requests serially
-    async with httpx.AsyncClient(timeout=600) as client:
-        resp = await client.post(
-            f"{config.VLLM_BASE_URL}/chat/completions",
-            headers=headers,
-            json={**payload, "response_format": {"type": "json_object"}},
-        )
-        if resp.status_code == 400:
-            # server/model without JSON-mode support — retry as plain completion
+    async with httpx.AsyncClient(timeout=config.VLLM_HTTP_TIMEOUT_S) as client:
+        if json_mode:
             resp = await client.post(
-                f"{config.VLLM_BASE_URL}/chat/completions", headers=headers, json=payload
+                url, headers=headers, json={**payload, "response_format": {"type": "json_object"}}
             )
+            if resp.status_code == 400:
+                # server/model without JSON-mode support — retry as plain completion
+                resp = await client.post(url, headers=headers, json=payload)
+        else:
+            resp = await client.post(url, headers=headers, json=payload)
         resp.raise_for_status()
     choice = resp.json()["choices"][0]
     content = choice["message"]["content"]
     truncated = choice.get("finish_reason") == "length"
     return content, truncated
+
+
+async def chat_text(prompt: str) -> str:
+    """Free-text (non-JSON) LLM completion with the same retry/backoff and
+    truncation-budget growth as _chat_json. Returns the trimmed text."""
+    headers = _auth_headers()
+    max_tokens = config.MAX_OUTPUT_TOKENS
+    last_error = "no attempts made"
+
+    for attempt in range(config.LLM_MAX_RETRIES + 1):
+        if attempt:
+            await asyncio.sleep(min(2 ** (attempt - 1), 8))
+        try:
+            content, truncated = await _request_content(prompt, headers, max_tokens, json_mode=False)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code not in _RETRYABLE_STATUS:
+                raise
+            last_error = f"HTTP {exc.response.status_code}"
+            continue
+        except (httpx.TransportError, httpx.TimeoutException) as exc:
+            last_error = f"{type(exc).__name__}: {exc}"
+            continue
+
+        if truncated and attempt < config.LLM_MAX_RETRIES:
+            max_tokens = min(max_tokens * 2, config.MAX_OUTPUT_TOKENS_CAP)
+            last_error = "response truncated at token limit"
+            continue
+
+        if content and content.strip():
+            return content.strip()
+        last_error = "empty response"
+
+    raise ValueError(
+        f"LLM text generation failed after {config.LLM_MAX_RETRIES + 1} attempts: {last_error}"
+    )
 
 
 def _parse_json_array(content: str) -> list[dict]:

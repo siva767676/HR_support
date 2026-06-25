@@ -4,6 +4,9 @@ services:
     ports:
       - "8080:8080"
     env_file: .env
+    # The LLM endpoint (172.20.7.22:11434) is a remote GPU host reachable from
+    # inside the container via the pinned subnet below, so VLLM_BASE_URL from
+    # .env is used directly (no host.docker.internal override needed).
     # Resumes and JDs are uploaded through the browser, so no host folder is
     # mounted. The embedding model is baked into the image (see Dockerfile);
     # the container only needs network access to your LLM host.

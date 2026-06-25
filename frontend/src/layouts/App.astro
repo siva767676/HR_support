@@ -1,0 +1,56 @@
+---
+import "@/styles/global.css";
+import Logo from "@/components/site/Logo.astro";
+
+interface Props {
+  title?: string;
+  description?: string;
+  active?: "jd" | "screening" | "interview" | "";
+}
+const { title = "MEDHA", description = "", active = "" } = Astro.props;
+
+const links = [
+  { key: "jd", label: "JD Generation", href: "/jd" },
+  { key: "screening", label: "CV Analyzer", href: "/screening" },
+  { key: "interview", label: "AI Interview", href: "/interview" },
+];
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    {description && <meta name="description" content={description} />}
+    <meta name="robots" content="noindex" />
+    <link rel="icon" type="image/png" href="/myhomegroup-logo.png" />
+    <meta name="theme-color" content="#E11A20" />
+  </head>
+  <body class="min-h-screen bg-muted/30 text-foreground antialiased">
+    <header class="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur">
+      <div class="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4 sm:px-6">
+        <Logo class="shrink-0" />
+        <nav class="ml-auto flex items-center gap-1 overflow-x-auto text-sm">
+          <a
+            href="/"
+            class="rounded-md px-3 py-1.5 font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >Home</a>
+          {links.map((l) => (
+            <a
+              href={l.href}
+              aria-current={active === l.key ? "page" : undefined}
+              class={`whitespace-nowrap rounded-md px-3 py-1.5 font-medium transition-colors ${
+                active === l.key
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+            >{l.label}</a>
+          ))}
+        </nav>
+      </div>
+    </header>
+    <main class="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+      <slot />
+    </main>
+  </body>
+</html>

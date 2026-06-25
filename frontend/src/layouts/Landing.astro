@@ -1,0 +1,44 @@
+---
+import "@/styles/global.css";
+import { faqs } from "@/lib/content";
+
+interface Props { title?: string; description?: string }
+const {
+  title = "MEDHA | AI Resume Screening by MY HOME GROUP",
+  description = "MEDHA screens resumes in bulk and ranks candidates by fit. Generate job descriptions, analyze CVs, and run AI-assisted interviews, all on your own infrastructure.",
+} = Astro.props;
+
+const faqLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqs.map((f) => ({
+    "@type": "Question",
+    name: f.q,
+    acceptedAnswer: { "@type": "Answer", text: f.a },
+  })),
+};
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="robots" content="index, follow" />
+    <link rel="icon" type="image/png" href="/myhomegroup-logo.png" />
+    <link rel="canonical" href="/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:site_name" content="MY HOME GROUP" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="theme-color" content="#E11A20" />
+    <script type="application/ld+json" set:html={JSON.stringify(faqLd)} />
+  </head>
+  <body class="bg-background text-foreground antialiased">
+    <slot />
+  </body>
+</html>

@@ -1,12 +1,24 @@
 import asyncio
 import logging
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse, PlainTextResponse, Response
+from fastapi.staticfiles import StaticFiles
 
-from . import config, scoring
+from . import (
+    config,
+    db,
+    interview_service,
+    jd_docx,
+    jd_generator,
+    jd_store,
+    notifications,
+    reporting,
+    scoring,
+)
 from .embeddings import embed_texts
 from .evaluator import (
     evaluate_resume,
@@ -16,9 +28,18 @@ from .evaluator import (
 from .extraction import extract_text
 from .vector_store import VectorStore
 
-app = FastAPI(title="AI Resume Screening & Scoring System")
-
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    # Initialize the DB schema and ensure a default email template exists.
+    db.init_db()
+    notifications.ensure_default_template()
+    yield
+
+
+app = FastAPI(title="AI Resume Screening & Scoring System", lifespan=_lifespan)
 
 RUNS: dict[str, dict] = {}
 
@@ -28,20 +49,127 @@ RUNS: dict[str, dict] = {}
 _background_tasks: set[asyncio.Task] = set()
 
 _STATIC = Path(__file__).parent / "static"
+_FRONTEND = Path(__file__).parent.parent / "frontend" / "dist"
 
 SUPPORTED_EXTS = {".pdf", ".docx", ".txt", ".md"}
 
 
+# The working screening UI (self-contained SPA). It lives at /app, where the new
+# landing page's CTAs point, and at /legacy as an explicit alias during migration.
+@app.get("/app")
+@app.get("/legacy")
+async def app_ui():
+    return FileResponse(_STATIC / "index.html")
+
+
+# Landing page at / once the Astro site is built; before that, fall back to the app
+# so a fresh checkout without a frontend build still serves a working UI at /.
 @app.get("/")
 async def index():
-    return FileResponse(_STATIC / "index.html")
+    landing = _FRONTEND / "index.html"
+    return FileResponse(
+        landing if landing.exists() else _STATIC / "index.html",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
+# ============================ JD repository / generator ============================
+
+_JD_FIELDS = ("title", "location", "reporting", "experience", "skills",
+              "responsibilities", "requirements")
+
+
+def _jd_fields(payload: dict) -> dict:
+    return {k: (payload.get(k) or "").strip() for k in _JD_FIELDS}
+
+
+@app.post("/api/jds/generate")
+async def generate_jd(payload: dict = Body(...)):
+    """AI-generate a JD body (Markdown) from recruiter inputs. Not yet saved."""
+    fields = _jd_fields(payload)
+    if not fields["title"]:
+        raise HTTPException(400, "A job title is required to generate a JD")
+    try:
+        body = await jd_generator.generate_jd(**fields)
+    except Exception as exc:  # noqa: BLE001 - surface a clean message to the UI
+        raise HTTPException(502, f"JD generation failed: {exc}")
+    # Preview the finalized formatting too, so the UI can show what 'Save' will store.
+    return {"body": body, "preview": jd_store.apply_template(fields, body)}
+
+
+@app.get("/api/jds")
+async def list_jds(search: str | None = None):
+    return {"jds": jd_store.list_jds(search)}
+
+
+@app.post("/api/jds")
+async def create_jd(payload: dict = Body(...)):
+    fields = _jd_fields(payload)
+    if not fields["title"]:
+        raise HTTPException(400, "A job title is required")
+    body = (payload.get("body") or "").strip()
+    if not body:
+        raise HTTPException(400, "JD content is empty — generate or write a body first")
+    return jd_store.create_jd(fields, body)
+
+
+@app.get("/api/jds/{jd_id}")
+async def get_jd(jd_id: int):
+    record = jd_store.get_jd(jd_id)
+    if not record:
+        raise HTTPException(404, "JD not found")
+    return record
+
+
+@app.put("/api/jds/{jd_id}")
+async def update_jd(jd_id: int, payload: dict = Body(...)):
+    fields = _jd_fields(payload)
+    # On edit the recruiter changes the finalized content directly (if provided).
+    content = payload.get("content")
+    record = jd_store.update_jd(jd_id, fields, content)
+    if not record:
+        raise HTTPException(404, "JD not found")
+    return record
+
+
+@app.delete("/api/jds/{jd_id}")
+async def delete_jd(jd_id: int):
+    if not jd_store.delete_jd(jd_id):
+        raise HTTPException(404, "JD not found")
+    return {"deleted": jd_id}
+
+
+@app.get("/api/jds/{jd_id}/download")
+async def download_jd(jd_id: int):
+    record = jd_store.get_jd(jd_id)
+    if not record:
+        raise HTTPException(404, "JD not found")
+    return PlainTextResponse(
+        record["content"],
+        media_type="text/markdown",
+        headers={"Content-Disposition": f'attachment; filename="{jd_store.download_name(record)}"'},
+    )
+
+
+@app.get("/api/jds/{jd_id}/download.docx")
+async def download_jd_docx(jd_id: int):
+    record = jd_store.get_jd(jd_id)
+    if not record:
+        raise HTTPException(404, "JD not found")
+    fname = jd_store.download_name(record).rsplit(".", 1)[0] + ".docx"
+    return Response(
+        jd_docx.jd_docx_bytes(record),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
 
 
 @app.post("/api/screenings")
 async def create_screening(
     top_k: int = Form(default=config.TOP_K),
     resumes: list[UploadFile] = File(...),
-    jd_files: list[UploadFile] = File(...),
+    jd_files: list[UploadFile] = File(default=[]),
+    jd_id: int | None = Form(default=None),
 ):
     # Guard: cap the resume count up front, before reading anything into memory.
     if len(resumes) > config.MAX_RESUMES:
@@ -69,11 +197,18 @@ async def create_screening(
             sources.append(upload)
         return sources
 
-    # JD sources come from files uploaded by the user
-    jd_sources = [(Path(u.filename or "").name, await u.read()) for u in _collect(jd_files)]
-    if not jd_sources:
-        raise HTTPException(400, "No valid JD files uploaded")
-    jd_name = ", ".join(name for name, _ in jd_sources)
+    # JD source: a repository JD (by id) OR uploaded JD file(s).
+    if jd_id is not None:
+        record = jd_store.get_jd(jd_id)
+        if not record:
+            raise HTTPException(404, f"JD #{jd_id} not found in the repository")
+        jd_sources = [(jd_store.download_name(record), record["content"].encode("utf-8"))]
+        jd_name = record["title"]
+    else:
+        jd_sources = [(Path(u.filename or "").name, await u.read()) for u in _collect(jd_files)]
+        if not jd_sources:
+            raise HTTPException(400, "Upload a JD file or choose one from the repository")
+        jd_name = ", ".join(name for name, _ in jd_sources)
 
     resume_sources = [(Path(u.filename or "").name, await u.read()) for u in _collect(resumes)]
     if not resume_sources:
@@ -118,6 +253,158 @@ async def get_screening(run_id: str):
         reverse=True,
     )
     return view
+
+
+@app.get("/api/screenings/{run_id}/report.xlsx")
+async def download_shortlist_report(run_id: str):
+    run = RUNS.get(run_id)
+    if run is None:
+        raise HTTPException(404, "Unknown run id")
+    return Response(
+        reporting.shortlist_xlsx(run),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="shortlist-{run_id}.xlsx"'},
+    )
+
+
+# ============================ Email templates ============================
+
+@app.get("/api/email-templates")
+async def list_email_templates():
+    notifications.ensure_default_template()  # always keep at least the default available
+    return {"templates": notifications.list_templates(), "email_enabled": config.EMAIL_ENABLED}
+
+
+@app.post("/api/email-templates")
+async def create_email_template(payload: dict = Body(...)):
+    if not (payload.get("subject") and payload.get("body")):
+        raise HTTPException(400, "Template subject and body are required")
+    return notifications.create_template(
+        payload.get("name", ""), payload["subject"], payload["body"]
+    )
+
+
+@app.put("/api/email-templates/{tid}")
+async def update_email_template(tid: int, payload: dict = Body(...)):
+    rec = notifications.update_template(
+        tid, payload.get("name", ""), payload.get("subject", ""), payload.get("body", "")
+    )
+    if not rec:
+        raise HTTPException(404, "Template not found")
+    return rec
+
+
+@app.delete("/api/email-templates/{tid}")
+async def delete_email_template(tid: int):
+    if not notifications.delete_template(tid):
+        raise HTTPException(404, "Template not found")
+    return {"deleted": tid}
+
+
+# ============================ Shortlist notifications ============================
+
+def _run_or_404(run_id: str) -> dict:
+    run = RUNS.get(run_id)
+    if run is None:
+        raise HTTPException(404, "Unknown run id")
+    return run
+
+
+def _template_or_400(template_id) -> dict:
+    # Fall back to the default if the id is missing OR stale/deleted.
+    t = (notifications.get_template(template_id) if template_id else None) or notifications.default_template()
+    if not t:
+        raise HTTPException(400, "No email template available")
+    return t
+
+
+@app.post("/api/screenings/{run_id}/notifications/preview")
+async def preview_notifications(run_id: str, payload: dict = Body(default={})):
+    run = _run_or_404(run_id)
+    template = _template_or_400(payload.get("template_id"))
+    return {"template": template, "previews": notifications.build_previews(run, template)}
+
+
+@app.post("/api/screenings/{run_id}/notifications/send")
+async def send_shortlist_notifications(run_id: str, payload: dict = Body(default={})):
+    run = _run_or_404(run_id)
+    template = _template_or_400(payload.get("template_id"))
+    return notifications.send_notifications(run, template)
+
+
+@app.get("/api/screenings/{run_id}/notifications")
+async def list_run_notifications(run_id: str):
+    return {"notifications": notifications.list_notifications(run_id)}
+
+
+# ============================ AI interview ============================
+
+@app.post("/api/interview/start")
+async def interview_start(payload: dict = Body(...)):
+    """Plan a tailored interview from a role + JD + resume text; return question 1.
+
+    In-memory only (nothing is stored): the returned thread_id is valid until the
+    process restarts. Voice/avatar are out of scope; this is the text engine.
+    """
+    role = (payload.get("role") or "").strip()
+    jd = (payload.get("job_description") or "").strip()
+    resume = (payload.get("resume_text") or "").strip()
+    if not role:
+        raise HTTPException(400, "A role is required to start an interview")
+    if not jd:
+        raise HTTPException(400, "A job description is required to start an interview")
+    if not resume:
+        raise HTTPException(400, "Candidate resume text is required to start an interview")
+    name = (payload.get("candidate_name") or "Candidate").strip()
+    try:
+        result = await interview_service.start_interview(
+            candidate_name=name,
+            role=role,
+            experience_level=(payload.get("experience_level") or "mid").strip(),
+            resume_text=resume,
+            job_description=jd,
+            assessment_summary=(payload.get("assessment_summary") or "").strip(),
+            max_questions=payload.get("max_questions", 5),
+        )
+    except Exception as exc:  # noqa: BLE001 - surface a clean message to the UI
+        raise HTTPException(502, f"Could not start interview: {exc}")
+    return {**result, "role": role, "candidate_name": name}
+
+
+@app.post("/api/extract")
+async def extract_document(file: UploadFile = File(...)):
+    """Extract plain text from one uploaded document (PDF, DOCX, TXT, MD).
+
+    Used by the interview module so a recruiter can upload a resume instead of
+    pasting text. Nothing is stored: the extracted text is returned to the caller.
+    """
+    name = Path(file.filename or "").name
+    if Path(name).suffix.lower() not in SUPPORTED_EXTS:
+        raise HTTPException(400, "Unsupported file type. Upload a PDF, DOCX, TXT, or MD file.")
+    data = await file.read()
+    if len(data) > config.MAX_FILE_MB * 1024 * 1024:
+        raise HTTPException(413, f"File exceeds the {config.MAX_FILE_MB} MB limit")
+    try:
+        text = await asyncio.to_thread(extract_text, name, data)
+    except ValueError as exc:
+        raise HTTPException(422, f"Could not read {name}: {exc}")
+    return {"filename": name, "text": text, "chars": len(text)}
+
+
+@app.post("/api/interview/answer")
+async def interview_answer(payload: dict = Body(...)):
+    """Score the current answer and return the next question or the final report."""
+    thread_id = (payload.get("thread_id") or "").strip()
+    if not thread_id:
+        raise HTTPException(400, "thread_id is required")
+    try:
+        return await interview_service.submit_answer(thread_id, payload.get("answer") or "")
+    except interview_service.InterviewExpired:
+        raise HTTPException(
+            409, "This interview session has expired. Please start a new interview."
+        )
+    except Exception as exc:  # noqa: BLE001 - surface a clean message to the UI
+        raise HTTPException(502, f"Could not process answer: {exc}")
 
 
 async def _run_pipeline(
@@ -203,6 +490,7 @@ async def _run_pipeline(
                             result.update({
                                 "candidate_name": ev.get("candidate_name")
                                 or result["filename"],
+                                "candidate_email": ev.get("candidate_email"),
                                 "overall_score": score,
                                 "recommendation": scoring.recommendation(score),
                                 "scores": ev.get("scores", {}),
@@ -220,6 +508,11 @@ async def _run_pipeline(
                                 "years_experience_estimate": ev.get(
                                     "years_experience_estimate"
                                 ),
+                                "education": ev.get("education", []),
+                                "experience": ev.get("experience", []),
+                                "projects": ev.get("projects", []),
+                                "certifications": ev.get("certifications", []),
+                                "achievements": ev.get("achievements", []),
                                 "summary": ev.get("summary", ""),
                             })
                         else:
@@ -245,3 +538,27 @@ async def _run_pipeline(
     except Exception as exc:
         run["status"] = "error"
         run["error"] = str(exc)
+
+
+# Serve the built landing page's static assets (/_astro/*, /favicon.*). Mounted last,
+# after every API and page route, so those always win; this only catches asset paths.
+# Skipped when the frontend has not been built so startup never fails on a fresh clone.
+class _CachingStaticFiles(StaticFiles):
+    """Static serving with correct cache headers. Astro fingerprints every asset
+    under /_astro/ with a content hash, so those are immutable and safe to cache
+    for a year. HTML pages are NOT hashed, so they must revalidate on every load;
+    otherwise a redeploy (which changes asset hashes) leaves browsers on stale HTML
+    pointing at a deleted CSS/JS file, rendering the page completely unstyled."""
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        if response.status_code in (200, 304):
+            if path.startswith("_astro/"):
+                response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            else:
+                response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
+if _FRONTEND.exists():
+    app.mount("/", _CachingStaticFiles(directory=_FRONTEND, html=True), name="frontend")

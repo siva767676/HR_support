@@ -1,0 +1,12 @@
+---
+interface Props { dark?: boolean; class?: string }
+const { dark = false, class: cls = "" } = Astro.props;
+---
+<a href="/" class={`inline-flex items-center gap-2.5 leading-none ${cls}`} aria-label="MEDHA by MY HOME GROUP">
+  <span class="inline-flex items-center rounded-md bg-white px-2 py-1 shadow-sm ring-1 ring-black/5">
+    <img src="/myhomegroup-logo.png" alt="MY HOME GROUP" width="182" height="105" class="h-7 w-auto" />
+  </span>
+  <span class={`text-[19px] font-extrabold tracking-[0.02em] ${dark ? "text-white" : "text-foreground"}`}>
+    MEDHA
+  </span>
+</a>

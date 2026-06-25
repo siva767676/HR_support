@@ -253,12 +253,62 @@
                      width:32px; height:32px; border-radius:9px; background:var(--accent-soft); color:var(--accent);
                      display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; }
 
+  /* ---------- JD management: forms, fields, modal ---------- */
+  .field{ display:block; margin-bottom:14px; font-size:12px; font-weight:700; text-transform:uppercase;
+          letter-spacing:.04em; color:var(--muted); }
+  .field input, .field textarea, .jd-search{ display:block; width:100%; margin-top:7px; padding:10px 12px;
+          border:1px solid var(--line-2); border-radius:var(--radius-sm); font:inherit; font-weight:400;
+          text-transform:none; letter-spacing:normal; color:var(--text); background:#fff; }
+  .field textarea{ resize:vertical; line-height:1.5; }
+  .field input:focus, .field textarea:focus, .jd-search:focus{ outline:2px solid var(--accent); outline-offset:-2px; }
+  .fieldrow{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .seg-toggle{ display:inline-flex; border:1px solid var(--line-2); border-radius:var(--radius-sm);
+          overflow:hidden; margin-bottom:12px; }
+  .seg{ padding:8px 16px; border:0; background:#fff; color:var(--text-2); font:inherit; font-size:13px;
+          font-weight:600; cursor:pointer; transition:background .15s,color .15s; }
+  .seg + .seg{ border-left:1px solid var(--line-2); }
+  .seg.active{ background:var(--accent); color:#fff; }
+  .banner{ border-radius:var(--radius); padding:14px 16px; font-size:13.5px; margin-bottom:20px;
+           border:1px solid #fde68a; background:#fffbeb; color:#92400e; }
+  .banner.ok{ border-color:#bbf7d0; background:#f3faf5; color:var(--green); }
+  .note-card{ border:1px dashed var(--line-2); border-radius:var(--radius); padding:14px 16px;
+              color:var(--muted); font-size:13.5px; background:var(--surface-2); }
+  .mail{ border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; margin-bottom:12px; background:#fff; }
+  .mail .to{ font-size:13px; color:var(--text-2); margin-bottom:6px; }
+  .mail .subj{ font-weight:700; font-size:14px; margin-bottom:8px; }
+  .mail pre{ margin:0; white-space:pre-wrap; font:13px/1.55 'Segoe UI',system-ui,sans-serif; color:var(--text-2); }
+  .pill{ display:inline-block; padding:2px 9px; border-radius:999px; font-size:11px; font-weight:700; }
+  .pill.draft{ background:#eef2ff; color:var(--accent); }
+  .pill.sent{ background:var(--green-soft); color:var(--green); }
+  .pill.failed{ background:var(--red-soft); color:var(--red); }
+  .pill.skipped_no_email{ background:#fef3c7; color:var(--amber); }
+  code{ background:var(--surface-2); border:1px solid var(--line); border-radius:5px; padding:1px 6px;
+        font:12px Consolas,monospace; color:var(--accent); }
+  .jd-mono{ font-family:'Consolas',ui-monospace,monospace; font-size:13px; }
+  .jd-search{ max-width:280px; margin:0 0 0 auto; }
+  .jd-actions{ display:flex; gap:6px; flex-wrap:wrap; }
+  .icon-btn{ display:inline-flex; align-items:center; justify-content:center; gap:5px; width:34px; height:34px;
+          padding:0; border:1px solid var(--line-2); background:#fff; border-radius:8px; color:var(--text-2);
+          cursor:pointer; transition:background .15s,color .15s,border-color .15s; }
+  .icon-btn:hover{ background:var(--surface-2); color:var(--accent); }
+  .icon-btn.danger:hover{ color:var(--red); border-color:#f1c0c0; background:#fef5f5; }
+  .modal{ display:none; position:fixed; inset:0; z-index:100; background:rgba(15,23,42,.45);
+          align-items:flex-start; justify-content:center; padding:40px 16px; overflow-y:auto; }
+  .modal.open{ display:flex; }
+  .modal-card{ background:var(--surface); border-radius:14px; box-shadow:var(--shadow-md); width:100%;
+          max-width:760px; padding:24px 26px; }
+  .modal-head{ display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+  .modal-head h3{ margin:0; font-size:17px; font-weight:700; flex:1; }
+  .modal-close{ border:0; background:none; font-size:22px; line-height:1; color:var(--muted); cursor:pointer; }
+  .modal-foot{ display:flex; gap:10px; align-items:center; margin-top:18px; flex-wrap:wrap; }
+
   @media (max-width:760px){
     .nav-inner{ height:auto; flex-direction:column; align-items:flex-start; padding:12px 18px; gap:10px; }
     .nav-links{ width:100%; }
     .wrap{ padding:26px 18px 60px; }
-    .grid,.cols,.insights{ grid-template-columns:1fr; gap:20px; }
+    .grid,.cols,.insights,.fieldrow{ grid-template-columns:1fr; gap:20px; }
     .topk{ margin-left:0; }
+    .jd-search{ margin:0; max-width:none; }
   }
 </style>
 </head>
@@ -272,8 +322,10 @@
     </div>
     <div class="nav-links" id="navLinks">
       <a data-page="about">About</a>
+      <a data-page="jds">JD Management</a>
       <a data-page="getstarted">Get Started</a>
       <a data-page="shortlisted">Shortlisted Candidates<span class="dot" id="navShortCount">0</span></a>
+      <a data-page="notify">Notifications</a>
       <a data-page="dashboard">Dashboard</a>
     </div>
   </div>
@@ -297,9 +349,23 @@
         </div>
         <div>
           <p class="sec">Step 2 · Job Description</p>
-          <div class="drop" id="jdDrop"></div>
-          <input type="file" id="jdFileInput" accept=".pdf,.docx,.txt,.md" multiple style="display:none">
-          <div id="jdFileMeta" style="font-size:12px; color:var(--muted); margin-top:8px"></div>
+          <div class="seg-toggle">
+            <button type="button" class="seg active" id="jdSrcUpload">Upload file(s)</button>
+            <button type="button" class="seg" id="jdSrcRepo">From repository</button>
+          </div>
+          <div id="jdUploadBox">
+            <div class="drop" id="jdDrop"></div>
+            <input type="file" id="jdFileInput" accept=".pdf,.docx,.txt,.md" multiple style="display:none">
+            <div id="jdFileMeta" style="font-size:12px; color:var(--muted); margin-top:8px"></div>
+          </div>
+          <div id="jdRepoBox" style="display:none">
+            <select id="jdRepoSelect" class="jd-search" style="max-width:none;margin:0">
+              <option value="">Select a JD from the repository…</option>
+            </select>
+            <div style="font-size:12px;color:var(--muted-2);margin-top:8px">
+              Manage these in <a data-page="jds" style="color:var(--accent);cursor:pointer">JD Management</a>.
+            </div>
+          </div>
         </div>
       </div>
       <div class="actions">
@@ -324,7 +390,10 @@
     <div class="bar" id="bar"><div></div></div>
 
     <div class="card" id="resultsCard" style="display:none">
-      <h2 style="margin-bottom:16px">Ranked Candidates</h2>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+        <h2 style="margin:0">Ranked Candidates</h2>
+        <button class="btn-sm" id="dlExcel" type="button" style="margin-left:auto">Download Excel report</button>
+      </div>
       <table>
         <thead><tr>
           <th>#</th><th>Candidate</th><th>Similarity</th><th>Score</th><th>Recommendation</th>
@@ -335,6 +404,53 @@
     </div>
   </section>
 
+  <!-- ================= JD MANAGEMENT ================= -->
+  <section id="page-jds" class="page">
+    <p class="eyebrow">Repository</p>
+    <h1>JD Management</h1>
+    <p class="sub">Generate job descriptions with AI, format them to the company standard, and manage
+       your JD repository — create, edit, search, view and download.</p>
+
+    <div class="card">
+      <h2 style="margin-bottom:16px">Create a Job Description</h2>
+      <div class="fieldrow">
+        <label class="field">Job title<input id="jdTitle" placeholder="e.g. GET - PMO"></label>
+        <label class="field">Experience level<input id="jdExp" placeholder="e.g. 0-1 years"></label>
+      </div>
+      <div class="fieldrow">
+        <label class="field">Location<input id="jdLoc" placeholder="e.g. Hyderabad"></label>
+        <label class="field">Reporting to<input id="jdReport" placeholder="e.g. Head - PMO"></label>
+      </div>
+      <label class="field">Required skills<input id="jdSkills" placeholder="comma-separated, e.g. MS Excel, PowerPoint, MS Project, data analysis"></label>
+      <label class="field">Key responsibilities<textarea id="jdResp" rows="2" placeholder="What the role owns day to day"></textarea></label>
+      <label class="field">Other requirements<textarea id="jdReq" rows="2" placeholder="Education, certifications, domain, etc."></textarea></label>
+      <div class="actions" style="margin-top:4px">
+        <button class="btn-sm primary" id="jdGenBtn" type="button">Generate with AI</button>
+        <span id="jdGenStatus" style="font-size:13px;color:var(--muted)"></span>
+      </div>
+      <label class="field" style="margin-top:14px">JD content (editable)
+        <textarea id="jdBody" class="jd-mono" rows="12" placeholder="The generated JD appears here — edit freely, then save to the repository."></textarea>
+      </label>
+      <div class="actions">
+        <button id="jdSaveBtn" disabled>Save to Repository</button>
+        <span id="jdSaveStatus" style="font-size:13px"></span>
+        <button class="btn-sm" id="jdClearBtn" type="button" style="margin-left:auto">Clear</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+        <h2 style="margin:0">JD Repository</h2>
+        <input id="jdSearch" class="jd-search" placeholder="Search JDs…">
+      </div>
+      <table>
+        <thead><tr><th>Title</th><th>Experience</th><th>Skills</th><th>Updated</th><th>Actions</th></tr></thead>
+        <tbody id="jdTbody"></tbody>
+      </table>
+      <div id="jdEmpty" style="display:none;color:var(--muted);font-size:14px;padding:18px 4px"></div>
+    </div>
+  </section>
+
   <!-- ================= SHORTLISTED ================= -->
   <section id="page-shortlisted" class="page">
     <p class="eyebrow">Talent Pool</p>
@@ -342,7 +458,53 @@
     <p class="sub">Candidates selected during analysis, ranked by suitability. Each card explains
        why they were shortlisted — matched skills, experience relevance, strengths and the overall
        recommendation.</p>
+    <div id="shortlistedActions" style="margin-bottom:18px;display:none">
+      <button class="btn-sm primary" id="dlExcelShort" type="button">Download Excel report</button>
+      <button class="btn-sm" id="goNotify" type="button">Notify shortlisted →</button>
+    </div>
     <div id="shortlistedBody"></div>
+  </section>
+
+  <!-- ================= NOTIFICATIONS ================= -->
+  <section id="page-notify" class="page">
+    <p class="eyebrow">Outreach</p>
+    <h1>Shortlist Notifications</h1>
+    <p class="sub">Customize the email template and notify shortlisted candidates that they've
+       advanced to the next round. Recipient emails are taken from the CV analysis.</p>
+
+    <div class="banner" id="notifyBanner"></div>
+
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+        <h2 style="margin:0">Email template</h2>
+        <select id="tmplSelect" class="jd-search" style="max-width:260px;margin:0 0 0 auto"></select>
+        <button class="btn-sm" id="tmplNew" type="button">New</button>
+      </div>
+      <label class="field">Template name<input id="tmplName" placeholder="e.g. Shortlist Notification"></label>
+      <label class="field">Subject<input id="tmplSubject"></label>
+      <label class="field">Body<textarea id="tmplBody" class="jd-mono" rows="11"></textarea></label>
+      <div style="font-size:12px;color:var(--muted-2);margin-bottom:14px">
+        Placeholders:
+        <code>{{candidate_name}}</code> <code>{{job_title}}</code>
+        <code>{{company}}</code> <code>{{score}}</code> <code>{{recommendation}}</code>
+      </div>
+      <div class="actions">
+        <button id="tmplSave" type="button">Save template</button>
+        <span id="tmplStatus" style="font-size:13px"></span>
+        <button class="btn-sm" id="tmplDelete" type="button"
+                style="margin-left:auto;color:var(--red);border-color:#f1c0c0">Delete</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+        <h2 style="margin:0">Notify shortlisted candidates</h2>
+        <button class="btn-sm" id="notifyPreview" type="button" style="margin-left:auto">Preview</button>
+        <button id="notifySend" type="button">Send notifications</button>
+      </div>
+      <div id="notifySummary" style="font-size:13.5px;margin-bottom:12px"></div>
+      <div id="notifyList"></div>
+    </div>
   </section>
 
   <!-- ================= DASHBOARD ================= -->
@@ -385,11 +547,43 @@
 
 </main>
 
+<!-- JD view / edit modal -->
+<div class="modal" id="jdModal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3 id="jdModalTitle">Job Description</h3>
+      <button class="modal-close" id="jdModalClose" type="button" aria-label="Close">&times;</button>
+    </div>
+    <div class="fieldrow">
+      <label class="field">Title<input id="jdmTitle"></label>
+      <label class="field">Experience<input id="jdmExp"></label>
+    </div>
+    <div class="fieldrow">
+      <label class="field">Location<input id="jdmLoc"></label>
+      <label class="field">Reporting to<input id="jdmReport"></label>
+    </div>
+    <label class="field">Skills<input id="jdmSkills"></label>
+    <label class="field">Content (Markdown)
+      <textarea id="jdmContent" class="jd-mono" rows="16"></textarea>
+    </label>
+    <div class="modal-foot">
+      <button id="jdmSave" type="button">Save changes</button>
+      <button class="btn-sm" id="jdmDownload" type="button">Download .md</button>
+      <button class="btn-sm" id="jdmDownloadDocx" type="button">Download .docx</button>
+      <span id="jdmStatus" style="font-size:13px"></span>
+      <button class="btn-sm danger-btn" id="jdmDelete" type="button"
+              style="margin-left:auto;color:var(--red);border-color:#f1c0c0">Delete</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const $ = id => document.getElementById(id);
 const EXTS = [".pdf", ".docx", ".txt", ".md"];
 let pickedFiles = [];
 let jdFiles = [];
+let jdMode = "upload";       // "upload" (file) or "repo" (stored JD)
+let jdRepoId = "";           // selected repository JD id (repo mode)
 let pollTimer = null;
 
 // UI-only state (does not affect screening logic)
@@ -427,6 +621,11 @@ const ICONS = {
   lock:      '<rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
   info:      '<circle cx="12" cy="12" r="8.5"/><path d="M12 11.5v4.5"/><path d="M12 8h.01"/>',
   arrow:     '<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>',
+  plus:      '<path d="M12 5v14"/><path d="M5 12h14"/>',
+  edit:      '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  trash:     '<path d="M4 7h16"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/>',
+  wand:      '<path d="M15 4V2"/><path d="M15 10V8"/><path d="M12.5 6.5h-2"/><path d="M19.5 6.5h-2"/><path d="m3 21 12-12"/><path d="m14 7 3 3"/>',
+  doc:       '<path d="M14 4H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9z"/><path d="M14 4v5h5"/><path d="M9 13h6"/><path d="M9 16h6"/>',
 };
 function ic(name, size = 18) {
   return `<svg class="ic" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor"
@@ -450,6 +649,8 @@ function showPage(name) {
     a.classList.toggle("active", a.dataset.page === name));
   if (name === "shortlisted") renderShortlisted();
   if (name === "dashboard") renderDashboard();
+  if (name === "jds") loadJds();
+  if (name === "notify") loadNotify();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 document.querySelectorAll("[data-page]").forEach(el =>
@@ -488,6 +689,31 @@ $("folderInput").addEventListener("change", () => {
   updateReady();
 });
 
+// JD source toggle: upload file(s) vs choose a stored repository JD
+function setJdMode(mode) {
+  jdMode = mode;
+  $("jdSrcUpload").classList.toggle("active", mode === "upload");
+  $("jdSrcRepo").classList.toggle("active", mode === "repo");
+  $("jdUploadBox").style.display = mode === "upload" ? "block" : "none";
+  $("jdRepoBox").style.display = mode === "repo" ? "block" : "none";
+  if (mode === "repo") loadJdRepoOptions();
+  updateReady();
+}
+$("jdSrcUpload").onclick = () => setJdMode("upload");
+$("jdSrcRepo").onclick = () => setJdMode("repo");
+
+async function loadJdRepoOptions() {
+  const sel = $("jdRepoSelect");
+  try {
+    const data = await (await fetch("/api/jds")).json();
+    const cur = sel.value;
+    sel.innerHTML = `<option value="">Select a JD from the repository…</option>` +
+      (data.jds || []).map(j => `<option value="${j.id}">${esc(j.title)}</option>`).join("");
+    sel.value = cur;
+  } catch (e) { /* leave the placeholder */ }
+}
+$("jdRepoSelect").onchange = () => { jdRepoId = $("jdRepoSelect").value; updateReady(); };
+
 // top-K stepper (UI only — the value is still read from #topk by Analyze)
 function bumpTopK(delta) {
   const inp = $("topk");
@@ -503,10 +729,14 @@ $("topk").addEventListener("input", () => {
 });
 
 function updateReady() {
-  const ready = pickedFiles.length && jdFiles.length > 0;
+  const jdReady = jdMode === "upload" ? jdFiles.length > 0 : !!jdRepoId;
+  const ready = pickedFiles.length && jdReady;
   $("go").disabled = !ready;
   if (ready) {
-    $("pickInfo").innerHTML = `Evaluating <b>${pickedFiles.length}</b> resumes against <b>${jdFiles.length} JD file(s)</b>`;
+    const jdLabel = jdMode === "upload"
+      ? `${jdFiles.length} JD file(s)`
+      : `the selected repository JD`;
+    $("pickInfo").innerHTML = `Evaluating <b>${pickedFiles.length}</b> resumes against <b>${jdLabel}</b>`;
   } else {
     $("pickInfo").innerHTML = "";
   }
@@ -514,7 +744,11 @@ function updateReady() {
 
 $("go").onclick = async () => {
   const fd = new FormData();
-  for (const f of jdFiles) fd.append("jd_files", f, f.name);
+  if (jdMode === "upload") {
+    for (const f of jdFiles) fd.append("jd_files", f, f.name);
+  } else {
+    fd.append("jd_id", jdRepoId);
+  }
   fd.append("top_k", parseInt($("topk").value) || 20);
   for (const f of pickedFiles) fd.append("resumes", f, f.name);
 
@@ -611,6 +845,26 @@ function render(run) {
   renderPager(total, pages, start, pageRows.length);
 }
 
+// Extracted candidate profile (CV Analyzer): email + education/experience/projects/certs/achievements
+function cvAnalysisHtml(r) {
+  const block = (label, items) => (items && items.length)
+    ? `<div class="blk"><h4>${label}</h4><ul>${items.map(s => `<li>${esc(s)}</li>`).join("")}</ul></div>` : "";
+  const sections = [
+    block("Education", r.education),
+    block("Experience", r.experience),
+    block("Projects", r.projects),
+    block("Certifications", r.certifications),
+    block("Achievements", r.achievements),
+  ].join("");
+  if (!sections && !r.candidate_email) return "";
+  return `
+    <div style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
+      <h4 style="color:var(--accent);margin:0 0 10px">CV Analysis</h4>
+      ${r.candidate_email ? `<p style="font-size:13px;margin:0 0 12px;color:var(--text-2)"><b>Email:</b> ${esc(r.candidate_email)}</p>` : ""}
+      <div class="cols">${sections || `<p style="color:var(--muted)">No structured profile extracted.</p>`}</div>
+    </div>`;
+}
+
 function detailHtml(r) {
   if (r.error) return `<span class="errtext">Evaluation failed: ${esc(r.error)}</span>`;
   if (!r.scores) return `<em>No detailed evaluation (below similarity cutoff or still pending).</em>`;
@@ -633,7 +887,8 @@ function detailHtml(r) {
         <h4>Missing requirements</h4><ul>${list(r.missing_requirements)}</ul>
         ${r.years_experience_estimate != null ? `<h4>Estimated experience</h4><p style="font-size:13px;margin:0;color:var(--text-2)">${esc(r.years_experience_estimate)} years</p>` : ""}
       </div>
-    </div>`;
+    </div>
+    ${cvAnalysisHtml(r)}`;
 }
 
 /* ===================== RANKED RESULTS PAGINATION (UI only) ===================== */
@@ -690,6 +945,7 @@ const badgeClass = rec => rec === "Strong Match" ? "strong"
 function renderShortlisted() {
   const host = $("shortlistedBody");
   const rows = shortlistedResults();
+  $("shortlistedActions").style.display = rows.length ? "block" : "none";
   if (!rows.length) {
     host.innerHTML = emptyState("users", "No shortlisted candidates yet",
       "Run an analysis to see the candidates selected for in-depth evaluation here.");
@@ -700,6 +956,13 @@ function renderShortlisted() {
   host.querySelectorAll("[data-resume]").forEach(btn =>
     btn.addEventListener("click", () => openResume(btn.dataset.resume, btn.dataset.dl === "1")));
 }
+
+// Excel shortlist report (uses the current run id)
+function downloadExcel() {
+  if (lastRun && lastRun.id) window.open(`/api/screenings/${lastRun.id}/report.xlsx`, "_blank");
+}
+$("dlExcel").onclick = downloadExcel;
+$("dlExcelShort").onclick = downloadExcel;
 
 function candidateCard(r, rank) {
   const meters = Object.entries(SCORE_LABELS).map(([k, label]) => `
@@ -762,6 +1025,7 @@ function candidateCard(r, rank) {
             <p><span class="badge ${badgeClass(r.recommendation)}">${esc(r.recommendation || "Pending")}</span></p></div>
         </div>
       </div>
+      ${cvAnalysisHtml(r)}
     </div>
   </div>`;
 }
@@ -872,6 +1136,343 @@ function emptyState(iconName, title, msg) {
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+/* ===================== JD MANAGEMENT (UI) ===================== */
+let jdEditingId = null;
+let jdSearchTimer = null;
+
+function jdFields() {
+  return {
+    title: $("jdTitle").value.trim(),
+    location: $("jdLoc").value.trim(),
+    reporting: $("jdReport").value.trim(),
+    experience: $("jdExp").value.trim(),
+    skills: $("jdSkills").value.trim(),
+    responsibilities: $("jdResp").value.trim(),
+    requirements: $("jdReq").value.trim(),
+  };
+}
+
+async function loadJds(search) {
+  const q = search != null ? search : ($("jdSearch") ? $("jdSearch").value : "");
+  const url = q && q.trim() ? `/api/jds?search=${encodeURIComponent(q.trim())}` : "/api/jds";
+  try {
+    const data = await (await fetch(url)).json();
+    renderJdList(data.jds || []);
+  } catch (e) {
+    $("jdTbody").innerHTML = "";
+    $("jdEmpty").style.display = "block";
+    $("jdEmpty").innerHTML = `<span class="errtext">Failed to load JDs: ${esc(e.message)}</span>`;
+  }
+}
+
+function renderJdList(jds) {
+  const tb = $("jdTbody");
+  if (!jds.length) {
+    tb.innerHTML = "";
+    $("jdEmpty").style.display = "block";
+    $("jdEmpty").textContent = "No JDs yet — generate one above and save it to the repository.";
+    return;
+  }
+  $("jdEmpty").style.display = "none";
+  tb.innerHTML = jds.map(j => `
+    <tr>
+      <td><strong>${esc(j.title)}</strong></td>
+      <td>${esc(j.experience || "—")}</td>
+      <td style="color:var(--muted);font-size:13px">${esc(j.skills || "—")}</td>
+      <td style="color:var(--muted);font-size:13px">${esc((j.updated_at || "").slice(0, 10))}</td>
+      <td><div class="jd-actions">
+        <button class="icon-btn" title="View / edit" data-jd-open="${j.id}">${ic("eye", 16)}</button>
+        <button class="icon-btn" title="Download Markdown" data-jd-dl="${j.id}">${ic("download", 16)}</button>
+        <button class="icon-btn" title="Download Word (.docx)" data-jd-docx="${j.id}">${ic("doc", 16)}</button>
+        <button class="icon-btn danger" title="Delete" data-jd-del="${j.id}">${ic("trash", 16)}</button>
+      </div></td>
+    </tr>`).join("");
+  tb.querySelectorAll("[data-jd-open]").forEach(b => b.onclick = () => openJd(+b.dataset.jdOpen));
+  tb.querySelectorAll("[data-jd-dl]").forEach(b => b.onclick = () => window.open(`/api/jds/${b.dataset.jdDl}/download`, "_blank"));
+  tb.querySelectorAll("[data-jd-docx]").forEach(b => b.onclick = () => window.open(`/api/jds/${b.dataset.jdDocx}/download.docx`, "_blank"));
+  tb.querySelectorAll("[data-jd-del]").forEach(b => b.onclick = () => deleteJd(+b.dataset.jdDel));
+}
+
+$("jdGenBtn").onclick = async () => {
+  const f = jdFields();
+  if (!f.title) { $("jdGenStatus").innerHTML = `<span class="errtext">Enter a job title first.</span>`; return; }
+  $("jdGenBtn").disabled = true;
+  $("jdGenStatus").textContent = "Generating with AI… (this can take ~20s)";
+  try {
+    const resp = await fetch("/api/jds/generate", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(f),
+    });
+    if (!resp.ok) throw new Error((await resp.json()).detail || resp.statusText);
+    const data = await resp.json();
+    $("jdBody").value = data.body || "";
+    $("jdSaveBtn").disabled = !$("jdBody").value.trim();
+    $("jdGenStatus").innerHTML = `<span style="color:var(--green)">Draft ready — edit below, then save.</span>`;
+  } catch (e) {
+    $("jdGenStatus").innerHTML = `<span class="errtext">${esc(e.message)}</span>`;
+  } finally {
+    $("jdGenBtn").disabled = false;
+  }
+};
+
+$("jdBody").addEventListener("input", () => { $("jdSaveBtn").disabled = !$("jdBody").value.trim(); });
+
+$("jdSaveBtn").onclick = async () => {
+  const f = jdFields();
+  const body = $("jdBody").value.trim();
+  if (!f.title || !body) return;
+  $("jdSaveBtn").disabled = true;
+  $("jdSaveStatus").textContent = "Saving…";
+  try {
+    const resp = await fetch("/api/jds", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...f, body }),
+    });
+    if (!resp.ok) throw new Error((await resp.json()).detail || resp.statusText);
+    const rec = await resp.json();
+    $("jdSaveStatus").innerHTML = `<span style="color:var(--green)">Saved “${esc(rec.title)}” to repository.</span>`;
+    clearJdForm(false);
+    loadJds();
+  } catch (e) {
+    $("jdSaveStatus").innerHTML = `<span class="errtext">${esc(e.message)}</span>`;
+    $("jdSaveBtn").disabled = false;
+  }
+};
+
+function clearJdForm(resetStatus = true) {
+  ["jdTitle", "jdLoc", "jdReport", "jdExp", "jdSkills", "jdResp", "jdReq", "jdBody"].forEach(id => $(id).value = "");
+  $("jdSaveBtn").disabled = true;
+  if (resetStatus) { $("jdGenStatus").textContent = ""; $("jdSaveStatus").textContent = ""; }
+}
+$("jdClearBtn").onclick = () => clearJdForm();
+
+$("jdSearch").addEventListener("input", () => {
+  clearTimeout(jdSearchTimer);
+  jdSearchTimer = setTimeout(() => loadJds(), 250);
+});
+
+async function openJd(id) {
+  try {
+    const resp = await fetch(`/api/jds/${id}`);
+    if (!resp.ok) throw new Error((await resp.json()).detail || resp.statusText);
+    const j = await resp.json();
+    jdEditingId = id;
+    $("jdModalTitle").textContent = j.title;
+    $("jdmTitle").value = j.title || "";
+    $("jdmLoc").value = j.location || "";
+    $("jdmReport").value = j.reporting || "";
+    $("jdmExp").value = j.experience || "";
+    $("jdmSkills").value = j.skills || "";
+    $("jdmContent").value = j.content || "";
+    $("jdmStatus").textContent = "";
+    $("jdModal").classList.add("open");
+  } catch (e) { alert(e.message); }
+}
+
+function closeJdModal() { $("jdModal").classList.remove("open"); jdEditingId = null; }
+$("jdModalClose").onclick = closeJdModal;
+$("jdModal").addEventListener("click", e => { if (e.target === $("jdModal")) closeJdModal(); });
+
+$("jdmSave").onclick = async () => {
+  if (jdEditingId == null) return;
+  $("jdmSave").disabled = true;
+  $("jdmStatus").textContent = "Saving…";
+  try {
+    const resp = await fetch(`/api/jds/${jdEditingId}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: $("jdmTitle").value.trim(), location: $("jdmLoc").value.trim(),
+        reporting: $("jdmReport").value.trim(), experience: $("jdmExp").value.trim(),
+        skills: $("jdmSkills").value.trim(), content: $("jdmContent").value,
+      }),
+    });
+    if (!resp.ok) throw new Error((await resp.json()).detail || resp.statusText);
+    $("jdmStatus").innerHTML = `<span style="color:var(--green)">Saved.</span>`;
+    loadJds();
+  } catch (e) {
+    $("jdmStatus").innerHTML = `<span class="errtext">${esc(e.message)}</span>`;
+  } finally { $("jdmSave").disabled = false; }
+};
+
+$("jdmDownload").onclick = () => { if (jdEditingId != null) window.open(`/api/jds/${jdEditingId}/download`, "_blank"); };
+$("jdmDownloadDocx").onclick = () => { if (jdEditingId != null) window.open(`/api/jds/${jdEditingId}/download.docx`, "_blank"); };
+$("jdmDelete").onclick = () => { if (jdEditingId != null) deleteJd(jdEditingId, true); };
+
+async function deleteJd(id, fromModal) {
+  if (!confirm("Delete this JD? This cannot be undone.")) return;
+  try {
+    const resp = await fetch(`/api/jds/${id}`, { method: "DELETE" });
+    if (!resp.ok) throw new Error((await resp.json()).detail || resp.statusText);
+    if (fromModal) closeJdModal();
+    loadJds();
+  } catch (e) { alert(e.message); }
+}
+
+/* ===================== NOTIFICATIONS (UI) ===================== */
+let tmplCache = [];
+let emailEnabled = false;
+let tmplDirty = false;   // editor has unsaved edits / a fresh unsaved compose
+
+$("goNotify").onclick = () => showPage("notify");
+["tmplName", "tmplSubject", "tmplBody"].forEach(id =>
+  $(id).addEventListener("input", () => { tmplDirty = true; }));
+
+async function loadNotify() {
+  await loadTemplates();
+  renderNotifyState();
+}
+
+async function loadTemplates() {
+  try {
+    const data = await (await fetch("/api/email-templates")).json();
+    tmplCache = data.templates || [];
+    emailEnabled = !!data.email_enabled;
+  } catch (e) { tmplCache = []; }
+  const b = $("notifyBanner");
+  if (emailEnabled) {
+    b.className = "banner ok";
+    b.textContent = "Live mode: SMTP is configured — Send will email candidates directly.";
+  } else {
+    b.className = "banner";
+    b.innerHTML = "<b>Draft mode.</b> SMTP is not configured, so no real emails are sent — " +
+      "notifications are prepared and recorded for review. Set the SMTP_* environment variables to enable sending.";
+  }
+  const sel = $("tmplSelect");
+  const cur = sel.value;
+  sel.innerHTML = tmplCache.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join("");
+  if (cur && tmplCache.some(t => String(t.id) === cur)) sel.value = cur;
+  fillTemplateEditor(currentTemplate());
+}
+
+function currentTemplate() {
+  const id = $("tmplSelect").value;
+  return tmplCache.find(t => String(t.id) === String(id)) || null;
+}
+
+function fillTemplateEditor(t) {
+  $("tmplName").value = t ? t.name : "";
+  $("tmplSubject").value = t ? t.subject : "";
+  $("tmplBody").value = t ? t.body : "";
+  $("tmplStatus").textContent = "";
+  tmplDirty = false;  // freshly loaded from a saved row
+}
+$("tmplSelect").onchange = () => fillTemplateEditor(currentTemplate());
+
+$("tmplNew").onclick = () => {
+  $("tmplSelect").value = "";
+  $("tmplName").value = ""; $("tmplSubject").value = ""; $("tmplBody").value = "";
+  $("tmplStatus").textContent = "";
+  tmplDirty = true;   // unsaved compose — must be saved before preview/send
+};
+
+$("tmplSave").onclick = async () => {
+  const name = $("tmplName").value.trim();
+  const subject = $("tmplSubject").value;
+  const body = $("tmplBody").value;
+  if (!subject.trim() || !body.trim()) {
+    $("tmplStatus").innerHTML = `<span class="errtext">Subject and body are required.</span>`; return;
+  }
+  const id = $("tmplSelect").value;
+  $("tmplSave").disabled = true; $("tmplStatus").textContent = "Saving…";
+  try {
+    const resp = await fetch(id ? `/api/email-templates/${id}` : "/api/email-templates", {
+      method: id ? "PUT" : "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, subject, body }),
+    });
+    if (!resp.ok) throw new Error((await resp.json()).detail || resp.statusText);
+    const rec = await resp.json();
+    await loadTemplates();
+    $("tmplSelect").value = String(rec.id); fillTemplateEditor(currentTemplate());
+    $("tmplStatus").innerHTML = `<span style="color:var(--green)">Saved.</span>`;
+  } catch (e) {
+    $("tmplStatus").innerHTML = `<span class="errtext">${esc(e.message)}</span>`;
+  } finally { $("tmplSave").disabled = false; }
+};
+
+$("tmplDelete").onclick = async () => {
+  const id = $("tmplSelect").value;
+  if (!id) { fillTemplateEditor(null); return; }
+  if (!confirm("Delete this template?")) return;
+  try {
+    const resp = await fetch(`/api/email-templates/${id}`, { method: "DELETE" });
+    if (!resp.ok) throw new Error((await resp.json()).detail || resp.statusText);
+    await loadTemplates();
+  } catch (e) { alert(e.message); }
+};
+
+function renderNotifyState() {
+  if (!lastRun || !lastRun.id) {
+    $("notifySummary").innerHTML = `<div class="note-card">Run a screening first (Get Started), then preview and notify the shortlisted candidates here.</div>`;
+    $("notifyList").innerHTML = "";
+  } else {
+    $("notifySummary").innerHTML = "Ready to notify the shortlisted candidates from the latest run.";
+    $("notifyList").innerHTML = "";
+  }
+}
+
+function notifyTemplateId() {
+  const id = $("tmplSelect").value;
+  return id ? parseInt(id) : null;
+}
+
+function templateReadyOrWarn() {
+  if (tmplDirty || !notifyTemplateId()) {
+    $("notifySummary").innerHTML = `<span class="errtext">Save the template first — unsaved edits aren't used for preview or send.</span>`;
+    return false;
+  }
+  return true;
+}
+
+$("notifyPreview").onclick = async () => {
+  if (!lastRun || !lastRun.id) { renderNotifyState(); return; }
+  if (!templateReadyOrWarn()) return;
+  $("notifySummary").textContent = "Building preview…";
+  try {
+    const resp = await fetch(`/api/screenings/${lastRun.id}/notifications/preview`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ template_id: notifyTemplateId() }),
+    });
+    if (!resp.ok) throw new Error((await resp.json()).detail || resp.statusText);
+    const data = await resp.json();
+    const withEmail = data.previews.filter(p => p.has_email).length;
+    $("notifySummary").innerHTML = `Preview for <b>${data.previews.length}</b> shortlisted candidate(s); <b>${withEmail}</b> have a valid email.`;
+    renderMailList(data.previews);
+  } catch (e) { $("notifySummary").innerHTML = `<span class="errtext">${esc(e.message)}</span>`; }
+};
+
+$("notifySend").onclick = async () => {
+  if (!lastRun || !lastRun.id) { renderNotifyState(); return; }
+  if (!templateReadyOrWarn()) return;
+  const verb = emailEnabled ? "send real emails to" : "prepare draft notifications for";
+  if (!confirm(`This will ${verb} all shortlisted candidates with a valid email. Continue?`)) return;
+  $("notifySend").disabled = true; $("notifySummary").textContent = "Processing…";
+  try {
+    const resp = await fetch(`/api/screenings/${lastRun.id}/notifications/send`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ template_id: notifyTemplateId() }),
+    });
+    if (!resp.ok) throw new Error((await resp.json()).detail || resp.statusText);
+    const data = await resp.json();
+    const c = data.counts;
+    $("notifySummary").innerHTML = data.mode === "live"
+      ? `<span style="color:var(--green)">Sent ${c.sent}</span>, failed ${c.failed}, skipped (no email) ${c.skipped_no_email}.`
+      : `<b>Draft mode</b> — ${c.drafted} notification(s) prepared (no emails sent); skipped (no email) ${c.skipped_no_email}.`;
+    renderMailList(data.items);
+  } catch (e) {
+    $("notifySummary").innerHTML = `<span class="errtext">${esc(e.message)}</span>`;
+  } finally { $("notifySend").disabled = false; }
+};
+
+function renderMailList(items) {
+  $("notifyList").innerHTML = (items || []).map(p => {
+    const to = p.has_email ? esc(p.email) : `<span style="color:var(--amber)">no valid email on resume</span>`;
+    const pill = p.status ? `<span class="pill ${esc(p.status)}">${esc(p.status.replace(/_/g, " "))}</span>` : "";
+    return `<div class="mail">
+      <div class="to"><b>${esc(p.candidate_name)}</b> &nbsp;·&nbsp; To: ${to} ${pill}</div>
+      <div class="subj">${esc(p.subject)}</div>
+      <pre>${esc(p.body)}</pre>
+    </div>`;
+  }).join("") || `<div class="note-card">No shortlisted candidates to notify.</div>`;
+}
 
 /* ===================== INITIAL PAINT ===================== */
 // fill all static [data-ic] placeholders (logo, tooltip, feature tiles)

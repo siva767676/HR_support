@@ -1,0 +1,10 @@
+---
+import Landing from "@/layouts/Landing.astro";
+import MedhaLanding from "@/components/medha/MedhaLanding";
+---
+
+<Landing>
+  <MedhaLanding client:only="react">
+    <div slot="fallback" class="min-h-screen bg-[#07090C]"></div>
+  </MedhaLanding>
+</Landing>
