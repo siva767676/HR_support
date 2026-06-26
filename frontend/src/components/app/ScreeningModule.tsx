@@ -3,13 +3,11 @@ import { ScanSearch, Download, FolderOpen, RotateCcw, Eye, FileText, ChevronLeft
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { Dropdown, PageHeader, Spinner, inputCls } from "./ui";
 import { screening, jd as jdApi, extractDocument, type JdRecord, type ScreeningResult, type ScreeningRun } from "@/lib/api";
 
 const SUPPORTED = [".pdf", ".docx", ".txt", ".md"];
 const PER_PAGE = 10;
-
-const inputCls =
-  "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30";
 
 const STATUS: Record<string, string> = {
   extracting: "Reading files",
@@ -19,10 +17,6 @@ const STATUS: Record<string, string> = {
   complete: "Complete",
   error: "Error",
 };
-
-function Spinner({ className }: { className?: string }) {
-  return <span className={cn("inline-block size-4 animate-spin rounded-full border-2 border-current border-t-transparent", className)} aria-hidden="true" />;
-}
 
 function recTone(rec: string | null) {
   if (rec === "Strong Match") return "bg-emerald-50 text-emerald-700 ring-emerald-600/20";
@@ -136,22 +130,18 @@ export default function ScreeningModule() {
 
   return (
     <div>
-      <header className="mb-6">
-        <div className="flex items-center gap-2 text-sm font-semibold text-primary">
-          <ScanSearch className="size-4" /> CV Analyzer
-        </div>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight">Screen and rank candidates</h1>
-        <p className="mt-2 max-w-2xl text-muted-foreground">
-          Upload a folder of resumes and pick a job description. A semantic shortlist narrows the field,
-          then the model scores each shortlisted candidate and ranks them by fit.
-        </p>
-      </header>
+      <PageHeader
+        icon={<ScanSearch className="size-6" />}
+        eyebrow="CV Analyzer"
+        title="Screen and rank candidates"
+        description="Upload a folder of resumes and pick a job description. A semantic shortlist narrows the field, then the model scores each shortlisted candidate and ranks them by fit."
+      />
 
       {error && <div className="mb-6 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
 
       {phase === "setup" && (
         <div className="grid gap-6 lg:grid-cols-2">
-          <div className="space-y-5 rounded-xl border border-border bg-card p-6 shadow-sm">
+          <div className="space-y-5 rounded-2xl border border-border bg-card p-6 shadow-sm">
             <div>
               <p className="mb-1.5 text-sm font-medium text-foreground">Resumes folder</p>
               <button
@@ -181,7 +171,7 @@ export default function ScreeningModule() {
             </div>
           </div>
 
-          <div className="flex flex-col rounded-xl border border-border bg-card p-6 shadow-sm">
+          <div className="flex flex-col rounded-2xl border border-border bg-card p-6 shadow-sm">
             <p className="mb-1.5 text-sm font-medium text-foreground">Job description</p>
             <div className="mb-4 inline-flex w-fit rounded-lg border border-border bg-background p-1">
               {(["repo", "upload"] as const).map((m) => (
@@ -199,12 +189,12 @@ export default function ScreeningModule() {
             </div>
 
             {jdMode === "repo" ? (
-              <select className={inputCls} value={jdId} onChange={(e) => setJdId(e.target.value === "" ? "" : Number(e.target.value))}>
-                <option value="">Select a saved JD…</option>
-                {jds.map((j) => (
-                  <option key={j.id} value={j.id}>{j.title}</option>
-                ))}
-              </select>
+              <Dropdown
+                value={jdId === "" ? "" : String(jdId)}
+                onChange={(v) => setJdId(v === "" ? "" : Number(v))}
+                options={jds.map((j) => ({ value: String(j.id), label: j.title }))}
+                placeholder="Select a saved JD…"
+              />
             ) : (
               <input
                 type="file"
@@ -224,7 +214,7 @@ export default function ScreeningModule() {
       )}
 
       {phase === "running" && (
-        <div className="mx-auto max-w-xl rounded-xl border border-border bg-card p-8 text-center shadow-sm">
+        <div className="mx-auto max-w-xl rounded-2xl border border-border bg-card p-8 text-center shadow-sm">
           <Spinner className="mx-auto mb-4 size-8 text-primary" />
           <p className="text-lg font-semibold text-foreground">{run ? STATUS[run.status] : "Starting…"}</p>
           {run && (
@@ -240,7 +230,7 @@ export default function ScreeningModule() {
       {phase === "results" && run && <Results run={run} resumes={resumes} onReset={reset} />}
 
       {phase === "results" && !run && (
-        <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
           <p className="text-sm text-muted-foreground">
             The screening run could not be loaded. It may have been cleared by a server restart.
           </p>
@@ -260,7 +250,7 @@ function Results({ run, resumes, onReset }: { run: ScreeningRun; resumes: File[]
 
   if (run.status === "error") {
     return (
-      <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-6">
+      <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-6">
         <p className="font-semibold text-destructive">Screening failed</p>
         <p className="mt-1 text-sm text-destructive/90">{run.error || "Unknown error."}</p>
         <Button variant="outline" size="lg" className="mt-4" onClick={onReset}><RotateCcw /> Start over</Button>
@@ -273,6 +263,10 @@ function Results({ run, resumes, onReset }: { run: ScreeningRun; resumes: File[]
   const safePage = Math.min(page, pageCount - 1);
   const start = safePage * PER_PAGE;
   const pageRows = run.results.slice(start, start + PER_PAGE);
+
+  const scored = run.results.filter((r) => r.overall_score != null);
+  const strong = run.results.filter((r) => r.recommendation === "Strong Match").length;
+  const avg = scored.length ? Math.round(scored.reduce((s, r) => s + (r.overall_score || 0), 0) / scored.length) : null;
 
   function preview(r: ScreeningResult) {
     const file = fileMap.get(r.filename);
@@ -306,13 +300,20 @@ function Results({ run, resumes, onReset }: { run: ScreeningRun; resumes: File[]
         </div>
       </div>
 
+      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="Resumes" value={run.total} />
+        <Stat label="Shortlisted" value={run.shortlisted} />
+        <Stat label="Strong matches" value={strong} accent="text-emerald-600" />
+        <Stat label="Avg score" value={avg != null ? avg : "—"} />
+      </div>
+
       {run.file_errors?.length > 0 && (
         <div className="mb-4 rounded-lg border border-amber-600/30 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
           {run.file_errors.length} file{run.file_errors.length === 1 ? "" : "s"} skipped: {run.file_errors.map((e) => e.filename).join(", ")}
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
+      <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-sm">
         <div className="min-w-[720px]">
           <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_8rem_8rem_8.5rem] items-center gap-3 border-b border-border bg-muted/40 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             <span>#</span>
@@ -559,6 +560,15 @@ function ResumePreview({ file }: { file?: File }) {
     <pre className="max-h-[58vh] overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-muted/30 p-4 font-sans text-xs leading-relaxed text-foreground">
       {text}
     </pre>
+  );
+}
+
+function Stat({ label, value, accent }: { label: string; value: React.ReactNode; accent?: string }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className={cn("mt-1 text-2xl font-bold tabular-nums text-foreground", accent)}>{value}</p>
+    </div>
   );
 }
 

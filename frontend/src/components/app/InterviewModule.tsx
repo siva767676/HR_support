@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Bot, ArrowRight, Check, FileText, Upload, Mic, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Dropdown, Field, PageHeader, Spinner, inputCls } from "./ui";
 import {
   interview,
   jd as jdApi,
@@ -19,31 +20,6 @@ const LEVELS = [
   { value: "mid", label: "Mid level" },
   { value: "senior", label: "Senior" },
 ];
-
-const inputCls =
-  "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30";
-
-function Spinner({ className }: { className?: string }) {
-  return (
-    <span
-      className={cn(
-        "inline-block size-4 animate-spin rounded-full border-2 border-current border-t-transparent",
-        className,
-      )}
-      aria-hidden="true"
-    />
-  );
-}
-
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-sm font-medium text-foreground">{label}</span>
-      {children}
-      {hint && <span className="mt-1 block text-xs text-muted-foreground">{hint}</span>}
-    </label>
-  );
-}
 
 function recTone(rec: string) {
   if (rec === "Strong Hire" || rec === "Hire")
@@ -302,17 +278,12 @@ export default function InterviewModule() {
 
   return (
     <div>
-      <header className="mb-8">
-        <div className="flex items-center gap-2 text-sm font-semibold text-primary">
-          <Bot className="size-4" /> AI Interview
-        </div>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight">AI Interview Assistant</h1>
-        <p className="mt-2 max-w-2xl text-muted-foreground">
-          Plan a tailored interview from a role, its job description, and the candidate's resume. MEDHA
-          asks one question at a time, scores each answer, and produces a hiring report. Nothing is
-          stored: the session lives in memory only.
-        </p>
-      </header>
+      <PageHeader
+        icon={<Bot className="size-6" />}
+        eyebrow="AI Interview"
+        title="AI Interview Assistant"
+        description="Plan a tailored interview from a role, its job description, and the candidate's resume. MEDHA asks one question at a time, scores each answer, and produces a hiring report. Nothing is stored: the session lives in memory only."
+      />
 
       {error && (
         <div className="mb-6 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -322,7 +293,7 @@ export default function InterviewModule() {
 
       {phase === "setup" && (
         <div className="grid gap-6 lg:grid-cols-2">
-          <div className="space-y-5 rounded-xl border border-border bg-card p-6 shadow-sm">
+          <div className="space-y-5 rounded-2xl border border-border bg-card p-6 shadow-sm">
             <div className="grid gap-5 sm:grid-cols-2">
               <Field label="Candidate name" hint="Optional">
                 <input className={inputCls} value={candidate} onChange={(e) => setCandidate(e.target.value)} placeholder="e.g. Ananya Sharma" />
@@ -331,11 +302,7 @@ export default function InterviewModule() {
                 <input className={inputCls} value={role} onChange={(e) => setRole(e.target.value)} placeholder="e.g. Site Engineer" />
               </Field>
               <Field label="Experience level">
-                <select className={inputCls} value={level} onChange={(e) => setLevel(e.target.value)}>
-                  {LEVELS.map((l) => (
-                    <option key={l.value} value={l.value}>{l.label}</option>
-                  ))}
-                </select>
+                <Dropdown value={level} onChange={setLevel} options={LEVELS} />
               </Field>
               <Field label="Questions" hint="Between 1 and 12">
                 <input
@@ -368,12 +335,12 @@ export default function InterviewModule() {
               </div>
 
               {jdMode === "repo" ? (
-                <select className={inputCls} value={jdId} onChange={(e) => setJdId(e.target.value === "" ? "" : Number(e.target.value))}>
-                  <option value="">Select a saved JD…</option>
-                  {jds.map((j) => (
-                    <option key={j.id} value={j.id}>{j.title}</option>
-                  ))}
-                </select>
+                <Dropdown
+                  value={jdId === "" ? "" : String(jdId)}
+                  onChange={(v) => setJdId(v === "" ? "" : Number(v))}
+                  options={jds.map((j) => ({ value: String(j.id), label: j.title }))}
+                  placeholder="Select a saved JD…"
+                />
               ) : (
                 <>
                   <button
@@ -406,7 +373,7 @@ export default function InterviewModule() {
             </div>
           </div>
 
-          <div className="flex flex-col rounded-xl border border-border bg-card p-6 shadow-sm">
+          <div className="flex flex-col rounded-2xl border border-border bg-card p-6 shadow-sm">
             <p className="mb-1.5 text-sm font-medium text-foreground">Candidate resume</p>
             <button
               type="button"
@@ -473,7 +440,7 @@ export default function InterviewModule() {
             <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(asked / Math.max(total, 1)) * 100}%` }} />
           </div>
 
-          <div className="mt-6 rounded-xl border border-border bg-card p-6 shadow-sm">
+          <div className="mt-6 rounded-2xl border border-border bg-card p-6 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-primary">{question.topic}</p>
             <p className="mt-2 text-lg font-medium leading-relaxed text-foreground">{question.question}</p>
           </div>
@@ -556,7 +523,7 @@ function Report({
   const [showTranscript, setShowTranscript] = useState(false);
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div className="rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8">
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-sm text-muted-foreground">Interview report</p>
@@ -618,7 +585,7 @@ function Report({
       {showTranscript && (
         <div className="space-y-4">
           {transcript.map((t, i) => (
-            <div key={i} className="rounded-xl border border-border bg-card p-5 shadow-sm">
+            <div key={i} className="rounded-2xl border border-border bg-card p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-wide text-primary">
                 Q{i + 1} · {t.question.topic}
               </p>

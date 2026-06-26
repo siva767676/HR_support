@@ -51,6 +51,29 @@ Guidelines:
 - Output ONLY the Markdown body, starting at "## About the Opportunity". No preamble, no code fences."""
 
 
+async def generate_skills(title: str) -> str:
+  """Generate a comma-separated list of required skills for a job role."""
+  prompt = f"""You are an expert recruiter at MY HOME GROUP, a leading Engineering & Construction organization.
+Given the job title below, generate a comma-separated list of core technical and soft skills required for this role.
+Be specific to construction/engineering domain. Output ONLY the comma-separated list, no explanation.
+
+Job title: {title or '(unspecified)'}"""
+  result = await evaluator.chat_text(prompt)
+  return result.strip()
+
+
+async def generate_responsibilities(title: str) -> str:
+  """Generate key responsibilities for a job role as a bullet-point list."""
+  prompt = f"""You are an expert recruiter at MY HOME GROUP, a leading Engineering & Construction organization.
+Given the job title below, generate 4-6 key responsibilities for this role.
+Format as bullet points (each line starts with '- '), be specific to construction/engineering domain.
+Output ONLY the bullet list, no explanation, no title.
+
+Job title: {title or '(unspecified)'}"""
+  result = await evaluator.chat_text(prompt)
+  return result.strip()
+
+
 async def generate_jd(
     title: str,
     experience: str = "",

@@ -91,10 +91,36 @@ async def generate_jd(payload: dict = Body(...)):
         raise HTTPException(400, "A job title is required to generate a JD")
     try:
         body = await jd_generator.generate_jd(**fields)
+        # Preview the finalized formatting too, so the UI can show what 'Save' will store.
+        return {"body": body, "preview": jd_store.apply_template(fields, body)}
     except Exception as exc:  # noqa: BLE001 - surface a clean message to the UI
         raise HTTPException(502, f"JD generation failed: {exc}")
-    # Preview the finalized formatting too, so the UI can show what 'Save' will store.
-    return {"body": body, "preview": jd_store.apply_template(fields, body)}
+
+
+@app.post("/api/jds/generate-skills")
+async def generate_skills(payload: dict = Body(...)):
+    """AI-generate required skills for a job role."""
+    title = (payload.get("title") or "").strip()
+    if not title:
+        raise HTTPException(400, "A job title is required")
+    try:
+        skills = await jd_generator.generate_skills(title)
+        return {"skills": skills}
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, f"Skill generation failed: {exc}")
+
+
+@app.post("/api/jds/generate-responsibilities")
+async def generate_responsibilities(payload: dict = Body(...)):
+    """AI-generate key responsibilities for a job role."""
+    title = (payload.get("title") or "").strip()
+    if not title:
+        raise HTTPException(400, "A job title is required")
+    try:
+        responsibilities = await jd_generator.generate_responsibilities(title)
+        return {"responsibilities": responsibilities}
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, f"Responsibility generation failed: {exc}")
 
 
 @app.get("/api/jds")

@@ -53,6 +53,10 @@ export const jd = {
   get: (id: number) => req<JdRecord>(`/jds/${id}`),
   generate: (fields: JdFields) =>
     req<{ body: string; preview: string }>("/jds/generate", json(fields)),
+  generateSkills: (title: string) =>
+    req<{ skills: string }>("/jds/generate-skills", json({ title })).then((r) => r.skills),
+  generateResponsibilities: (title: string) =>
+    req<{ responsibilities: string }>("/jds/generate-responsibilities", json({ title })).then((r) => r.responsibilities),
   create: (fields: JdFields, body: string) => req<JdRecord>("/jds", json({ ...fields, body })),
   update: (id: number, fields: JdFields, content?: string) =>
     req<JdRecord>(`/jds/${id}`, { ...json({ ...fields, content }), method: "PUT" }),

@@ -161,7 +161,7 @@ function Navbar() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <a href="/screening" className={cn(buttonVariants(), "hidden h-9 rounded-full px-5 md:inline-flex")}>
+          <a href="#features" className={cn(buttonVariants(), "hidden h-9 rounded-full px-5 md:inline-flex")}>
             Get Started
           </a>
           <Sheet open={open} onOpenChange={setOpen}>
@@ -187,7 +187,7 @@ function Navbar() {
                     {label}
                   </a>
                 ))}
-                <a href="/screening" onClick={() => setOpen(false)} className={cn(buttonVariants(), "mt-3 h-10 rounded-full")}>
+                <a href="#features" onClick={() => setOpen(false)} className={cn(buttonVariants(), "mt-3 h-10 rounded-full")}>
                   Get Started
                 </a>
               </nav>
@@ -281,7 +281,7 @@ function Hero() {
       </p>
 
       <a
-        href="/screening"
+        href="#features"
         className="hero-fade group mt-10 inline-flex h-12 items-center gap-2 rounded-full bg-white px-7 text-[15px] font-semibold text-[#07090C] shadow-lg shadow-black/30 transition-all duration-200 hover:scale-[1.03] hover:bg-white/90"
       >
         Get Started
@@ -527,7 +527,7 @@ function Faq() {
           <div className="lg:sticky lg:top-24 lg:self-start">
             <p className="text-sm font-semibold text-primary">FAQ</p>
             <h2 className="mt-2 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">Questions, answered</h2>
-            <a href="/screening" className={cn(buttonVariants(), "mt-6 inline-flex h-11 rounded-full px-6 text-[15px]")}>
+            <a href="#features" className={cn(buttonVariants(), "mt-6 inline-flex h-11 rounded-full px-6 text-[15px]")}>
               Get Started
             </a>
           </div>
