@@ -318,17 +318,25 @@ export function ScoreMeter({
 /* ───────────────────────────────── Stat tile ──────────────────────────── */
 
 export function StatTile({
-  label, value, accent, className,
+  label, value, accent, icon, className,
 }: {
   label: string;
   value: React.ReactNode;
   accent?: string;
+  icon?: React.ReactNode;
   className?: string;
 }) {
   return (
     <SurfaceCard pad="none" className={cn("p-4", className)}>
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className={cn("mt-1 text-2xl font-bold tabular-nums text-foreground", accent)}>{value}</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+        {icon && (
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            {icon}
+          </span>
+        )}
+      </div>
+      <p className={cn("mt-2 font-heading text-2xl font-bold tabular-nums text-foreground", accent)}>{value}</p>
     </SurfaceCard>
   );
 }

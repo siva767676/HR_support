@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ScanSearch, Download, RotateCcw, Eye, FileText,
-  ChevronLeft, ChevronRight, X, Trash2,
+  ChevronLeft, ChevronRight, X, Trash2, Users, CheckCircle2, Award, Gauge,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -55,6 +55,13 @@ function fmtSize(bytes: number): string {
 function fileExt(name: string): string {
   const i = name.lastIndexOf(".");
   return i >= 0 ? name.slice(i).toLowerCase() : "";
+}
+
+/* Up to two initials for a candidate avatar, derived from name (or filename). */
+function initials(name: string): string {
+  const parts = name.replace(/\.[^.]+$/, "").split(/[\s_\-.]+/).filter(Boolean);
+  if (!parts.length) return "?";
+  return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
 }
 
 function downloadFile(file: File) {
@@ -510,10 +517,10 @@ function Results({ run, resumes, onReset }: { run: ScreeningRun; resumes: File[]
       </div>
 
       <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatTile label="Resumes" value={run.total} />
-        <StatTile label="Shortlisted" value={run.shortlisted} />
-        <StatTile label="Strong matches" value={strong} accent="text-emerald-600" />
-        <StatTile label="Avg score" value={avg != null ? avg : "—"} />
+        <StatTile label="Resumes" value={run.total} icon={<Users className="size-4" />} />
+        <StatTile label="Shortlisted" value={run.shortlisted} icon={<CheckCircle2 className="size-4" />} />
+        <StatTile label="Strong matches" value={strong} accent="text-emerald-600" icon={<Award className="size-4" />} />
+        <StatTile label="Avg score" value={avg != null ? avg : "—"} icon={<Gauge className="size-4" />} />
       </div>
 
       {run.file_errors?.length > 0 && (
@@ -594,19 +601,26 @@ function ResultRow({
   onView: () => void; onPreview: () => void; onDownload: () => void;
 }) {
   const score = r.overall_score;
+  const medal =
+    rank === 1 ? "bg-amber-100 text-amber-700 ring-1 ring-inset ring-amber-300"
+    : rank === 2 ? "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-300"
+    : rank === 3 ? "bg-orange-100 text-orange-700 ring-1 ring-inset ring-orange-300"
+    : "bg-muted text-muted-foreground";
   return (
     <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_8rem_8rem_8.5rem] items-center gap-3 border-b border-border px-4 py-3 transition-colors last:border-0 hover:bg-muted/30">
-      <span className={cn(
-        "flex size-6 items-center justify-center rounded-md text-xs font-bold tabular-nums",
-        rank === 1 ? "bg-primary text-white" : "bg-muted text-muted-foreground",
-      )}>
+      <span className={cn("flex size-7 items-center justify-center rounded-lg text-xs font-bold tabular-nums", medal)}>
         {rank}
       </span>
-      <button onClick={onView} className="min-w-0 text-left">
-        <span className="block truncate text-sm font-medium text-foreground transition-colors hover:text-primary">
-          {r.candidate_name || r.filename}
+      <button onClick={onView} className="flex min-w-0 items-center gap-2.5 text-left">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/15 to-primary/5 text-[11px] font-bold text-primary ring-1 ring-inset ring-primary/15">
+          {initials(r.candidate_name || r.filename)}
         </span>
-        <span className="block truncate text-xs text-muted-foreground">{r.filename}</span>
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-medium text-foreground transition-colors hover:text-primary">
+            {r.candidate_name || r.filename}
+          </span>
+          <span className="block truncate text-xs text-muted-foreground">{r.filename}</span>
+        </span>
       </button>
       <span>
         {score != null
@@ -634,8 +648,15 @@ function CandidateDetails({ r, file, onDownload }: { r: ScreeningResult; file?: 
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-border p-5 pr-12">
-        <SheetTitle className="truncate text-lg font-bold">{r.candidate_name || r.filename}</SheetTitle>
-        <p className="mt-0.5 truncate text-xs text-muted-foreground">{r.filename}</p>
+        <div className="flex items-start gap-3">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/15 to-primary/5 text-sm font-bold text-primary ring-1 ring-inset ring-primary/15">
+            {initials(r.candidate_name || r.filename)}
+          </span>
+          <div className="min-w-0">
+            <SheetTitle className="truncate font-heading text-lg font-bold">{r.candidate_name || r.filename}</SheetTitle>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">{r.filename}</p>
+          </div>
+        </div>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <StatusChip tone={matchTone(r.recommendation)}>{r.recommendation || "Pending"}</StatusChip>
           {score != null && (
