@@ -6,7 +6,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import Markdown from "./Markdown";
-import { Dropdown, Field, PageHeader, Spinner, inputCls, inputErrCls } from "./ui";
+import {
+  Dropdown, Field, PageHeader, Spinner, inputCls, inputErrCls,
+  SurfaceCard, SegmentedControl, Banner, EmptyState, ErrorState, Skeleton,
+} from "./ui";
+import { ToastProvider, useToast } from "./toast";
 import { jd as jdApi, type JdFields, type JdRecord } from "@/lib/api";
 
 /* Common roles and locations for a construction / engineering org. "Others"
@@ -22,30 +26,29 @@ const LOCATIONS = [
   "Delhi NCR", "Visakhapatnam", "Vijayawada", "Kolkata", "Others",
 ];
 
-/* Animated skeleton shown in the preview while the model is generating. */
+/* Animated skeleton shown in the preview while the model is generating. Built on
+   the shared shimmer Skeleton primitive so every loading state matches. */
 function PreviewSkeleton() {
-  const Bar = ({ w }: { w: string }) => (
-    <div className="h-3 animate-pulse rounded bg-muted" style={{ width: w }} />
-  );
+  const Bar = ({ w }: { w: string }) => <Skeleton className="h-3" style={{ width: w }} />;
   return (
     <div className="space-y-6" aria-hidden="true">
       <div className="flex items-center gap-2 text-sm font-medium text-primary">
         <Spinner className="text-primary" /> Drafting the job description…
       </div>
       <div className="space-y-3">
-        <div className="h-4 w-40 animate-pulse rounded bg-muted" />
+        <Skeleton className="h-4 w-40" />
         <Bar w="100%" /><Bar w="92%" /><Bar w="97%" /><Bar w="60%" />
       </div>
       <div className="space-y-3">
-        <div className="h-4 w-48 animate-pulse rounded bg-muted" />
+        <Skeleton className="h-4 w-48" />
         <Bar w="88%" /><Bar w="95%" />
       </div>
       <div className="space-y-3">
-        <div className="h-4 w-36 animate-pulse rounded bg-muted" />
+        <Skeleton className="h-4 w-36" />
         {["94%", "82%", "90%", "70%"].map((w, i) => (
           <div key={i} className="flex items-center gap-2">
-            <div className="size-1.5 shrink-0 animate-pulse rounded-full bg-primary/40" />
-            <div className="h-3 animate-pulse rounded bg-muted" style={{ width: w }} />
+            <span className="size-1.5 shrink-0 rounded-full bg-primary/40" />
+            <Skeleton className="h-3" style={{ width: w }} />
           </div>
         ))}
       </div>
@@ -72,9 +75,17 @@ type FieldErrors = Partial<{
 }>;
 
 export default function JdModule() {
+  return (
+    <ToastProvider>
+      <JdModuleInner />
+    </ToastProvider>
+  );
+}
+
+function JdModuleInner() {
+  const { toast } = useToast();
   const [tab, setTab] = useState<"generate" | "repository">("generate");
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
 
   // generate
   const [fields, setFields] = useState<JdFields>(EMPTY);
@@ -205,7 +216,6 @@ export default function JdModule() {
   async function generate() {
     if (generating) return;            // guard against a fast double-click
     setError("");
-    setNotice("");
     setGenError("");
     if (!validateFields()) return;
     setShowPreview(true);              // panel slides in and shows the skeleton
@@ -233,7 +243,7 @@ export default function JdModule() {
     setSaving(true);
     try {
       const rec = await jdApi.create(fields, body);
-      setNotice(`Saved "${rec.title}" to the repository.`);
+      toast(`Saved "${rec.title}" to the repository.`, "success");
       setBody("");
       setFields(EMPTY);
       setRoleChoice(""); setRoleCustom(""); setLocChoice("Hyderabad"); setLocCustom("");
@@ -321,32 +331,28 @@ export default function JdModule() {
       ) : (
         <>
           {genError && (
-            <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            <Banner tone="error" className="mb-4 text-xs">
               Could not regenerate: {genError}. Showing the previous version.
-            </div>
+            </Banner>
           )}
           <Markdown md={body} />
         </>
       )
     ) : genError ? (
-      <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-        <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-destructive/10">
-          <X className="size-7 text-destructive/70" />
-        </div>
-        <p className="text-sm font-medium text-foreground">Generation failed</p>
-        <p className="mt-1 max-w-sm text-sm text-muted-foreground">{genError}</p>
-        <Button size="sm" className="mt-4" onClick={generate}><Sparkles /> Try again</Button>
-      </div>
+      <ErrorState
+        className="h-full"
+        icon={<X className="size-7" />}
+        title="Generation failed"
+        description={genError}
+        action={<Button size="sm" onClick={generate}><Sparkles /> Try again</Button>}
+      />
     ) : (
-      <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-        <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-muted">
-          <FileText className="size-7 text-muted-foreground/60" />
-        </div>
-        <p className="text-sm font-medium text-foreground">Your generated JD will appear here</p>
-        <p className="mt-1 max-w-xs text-sm text-muted-foreground">
-          Pick a role and a few details on the left, then generate a complete, on-template job description.
-        </p>
-      </div>
+      <EmptyState
+        className="h-full"
+        icon={<FileText className="size-7" />}
+        title="Your generated JD will appear here"
+        description="Pick a role and a few details on the left, then generate a complete, on-template job description."
+      />
     );
 
   return (
@@ -358,23 +364,17 @@ export default function JdModule() {
         description="Turn a few inputs into a complete JD in the company standard template, then save it to the repository to reuse in screening and interviews."
       />
 
-      <div className="mb-6 inline-flex rounded-lg border border-border bg-card p-1">
-        {(["generate", "repository"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => { setTab(t); setError(""); }}
-            className={cn(
-              "rounded-md px-4 py-1.5 text-sm font-medium capitalize transition-colors",
-              tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {t === "generate" ? "Generate" : "Repository"}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        className="mb-6"
+        value={tab}
+        onChange={(t) => { setTab(t); setError(""); }}
+        options={[
+          { value: "generate", label: "Generate" },
+          { value: "repository", label: "Repository" },
+        ]}
+      />
 
-      {error && <div className="mb-6 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
-      {notice && <div className="mb-6 rounded-lg border border-emerald-600/30 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{notice}</div>}
+      {error && <Banner tone="error" className="mb-6">{error}</Banner>}
 
       {tab === "generate" && (
         // Wrapper is centered and grows from the form's width to full width when the
@@ -385,8 +385,8 @@ export default function JdModule() {
         )}>
           <div className="flex flex-col gap-6 lg:flex-row lg:items-stretch lg:gap-8">
             {/* ------- Input form (centered ~55% alone; settles to ~34% left once preview opens) ------- */}
-            <div className={cn(
-              "w-full space-y-5 rounded-2xl border border-border bg-card p-6 shadow-sm transition-[width] duration-500 ease-out lg:shrink-0 lg:p-7",
+            <SurfaceCard className={cn(
+              "w-full space-y-5 transition-[width] duration-500 ease-out lg:shrink-0 lg:p-7",
               showPreview ? "lg:w-[34%]" : "lg:w-full",
             )}>
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -511,7 +511,7 @@ export default function JdModule() {
               <Button size="lg" onClick={generate} disabled={generating} className="w-full">
                 {generating ? <><Spinner /> Generating JD…</> : <><Sparkles /> Generate JD</>}
               </Button>
-            </div>
+            </SurfaceCard>
 
             {/* -------- Preview: hidden until Generate, then slides in from the right (~65%) -------- */}
             {showPreview && (
@@ -520,7 +520,7 @@ export default function JdModule() {
                     form's height — so the preview matches the form and scrolls inside
                     rather than growing the row. */}
                 <div key={genSeq} className="animate-slide-in-right lg:absolute lg:inset-0">
-                  <div className="flex flex-col rounded-2xl border border-border bg-card shadow-sm lg:h-full lg:min-h-[30rem]">
+                  <SurfaceCard pad="none" className="flex flex-col lg:h-full lg:min-h-[30rem]">
                     <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-3">
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-foreground">Preview</p>
@@ -550,7 +550,7 @@ export default function JdModule() {
                     <div className="h-[32rem] overflow-auto p-6 lg:h-auto lg:min-h-0 lg:flex-1 lg:p-8">
                       {previewContent}
                     </div>
-                  </div>
+                  </SurfaceCard>
                 </div>
               </div>
             )}
@@ -560,7 +560,7 @@ export default function JdModule() {
 
       {tab === "repository" && (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
-          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <SurfaceCard pad="none" className="p-4">
             <div className="relative mb-3">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <input className={cn(inputCls, "pl-9")} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by title, skills, content..." />
@@ -568,9 +568,12 @@ export default function JdModule() {
             <div className="max-h-[32rem] space-y-2 overflow-auto">
               {loadingList && <p className="px-1 py-6 text-center text-sm text-muted-foreground">Loading…</p>}
               {!loadingList && jds.length === 0 && (
-                <p className="px-1 py-6 text-center text-sm text-muted-foreground">
-                  No saved JDs yet. Generate one to get started.
-                </p>
+                <EmptyState
+                  className="py-10"
+                  icon={<FileText className="size-7" />}
+                  title="No saved JDs yet"
+                  description="Generate one to get started."
+                />
               )}
               {jds.map((j) => (
                 <button
@@ -588,9 +591,9 @@ export default function JdModule() {
                 </button>
               ))}
             </div>
-          </div>
+          </SurfaceCard>
 
-          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+          <SurfaceCard>
             {selected ? (
               <>
                 <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
@@ -611,12 +614,14 @@ export default function JdModule() {
                 </div>
               </>
             ) : (
-              <div className="flex h-full min-h-64 flex-col items-center justify-center text-center text-sm text-muted-foreground">
-                <ArrowRight className="mb-2 size-8 opacity-40" />
-                Select a JD to preview it, or download it as Markdown or Word.
-              </div>
+              <EmptyState
+                className="h-full min-h-64"
+                icon={<ArrowRight className="size-7" />}
+                title="Select a JD to preview"
+                description="Choose a saved job description to preview it, or download it as Markdown or Word."
+              />
             )}
-          </div>
+          </SurfaceCard>
         </div>
       )}
 
