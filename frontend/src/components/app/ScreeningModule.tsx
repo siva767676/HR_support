@@ -493,7 +493,7 @@ function Results({ run, resumes, onReset }: { run: ScreeningRun; resumes: File[]
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold tracking-tight">Results</h2>
+          <h2 className="font-heading text-xl font-bold tracking-tight">Results</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
             {run.jd_name} · {run.shortlisted} shortlisted of {run.total} resumes
           </p>

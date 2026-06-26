@@ -622,7 +622,7 @@ function JdModuleInner() {
               <>
                 <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
                   <div className="min-w-0">
-                    <h2 className="truncate text-xl font-bold tracking-tight">{selected.title}</h2>
+                    <h2 className="truncate font-heading text-xl font-bold tracking-tight">{selected.title}</h2>
                     <p className="mt-1 text-sm text-muted-foreground">
                       {[selected.location, selected.reporting && `Reports to ${selected.reporting}`, selected.experience].filter(Boolean).join(" · ") || "No metadata"}
                     </p>

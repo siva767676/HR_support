@@ -21,13 +21,13 @@ export function PageHeader({
 }) {
   return (
     <header className="mb-8 flex items-start gap-4">
-      <div className="hidden size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-inset ring-primary/15 sm:flex">
+      <div className="hidden size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/15 to-primary/5 text-primary ring-1 ring-inset ring-primary/15 shadow-sm sm:flex">
         {icon}
       </div>
       <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-wider text-primary">{eyebrow}</p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-[15px]">{description}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">{eyebrow}</p>
+        <h1 className="mt-1.5 font-heading text-2xl font-bold tracking-tight text-foreground sm:text-[2rem] sm:leading-[1.1]">{title}</h1>
+        <p className="mt-2.5 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-[15px]">{description}</p>
       </div>
     </header>
   );
@@ -163,7 +163,7 @@ export function SurfaceCard({
   return (
     <Tag
       className={cn(
-        "rounded-2xl border border-border bg-card shadow-sm",
+        "rounded-2xl border border-border bg-card shadow-[0_1px_2px_0_rgba(16,24,40,0.04),0_2px_8px_-2px_rgba(16,24,40,0.06)]",
         PAD[pad],
         hover && "hover-lift",
         className,
