@@ -13,6 +13,7 @@ import {
 } from "./ui";
 import { ToastProvider, useToast } from "./toast";
 import { UploadZone } from "./UploadZone";
+import { loadSession, saveSession, clearSession, setBusy, SESSION_KEYS } from "@/lib/session";
 import {
   screening, jd as jdApi, extractDocument,
   type JdRecord, type ScreeningResult, type ScreeningRun,
@@ -22,22 +23,24 @@ import {
 const SUPPORTED = [".pdf", ".docx", ".txt", ".md"];
 const PER_PAGE = 10;
 
+/* Pipeline order mirrors the backend: read files → parse the JD into structured
+   requirements → shortlist the closest matches → score the shortlist in depth. */
 const STATUS: Record<string, string> = {
   extracting: "Reading files",
-  embedding: "Shortlisting",
   extracting_requirements: "Parsing JD",
+  embedding: "Shortlisting",
   evaluating: "Scoring candidates",
   complete: "Complete",
   error: "Error",
 };
 const STATUS_FULL: Record<string, string> = {
-  extracting: "Reading files",
-  embedding: "Shortlisting by similarity",
-  extracting_requirements: "Extracting JD requirements",
+  extracting: "Reading resumes & JD",
+  extracting_requirements: "Parsing the job description",
+  embedding: "Shortlisting the closest matches",
   evaluating: "Scoring shortlisted candidates",
 };
-const STAGE_ORDER = ["extracting", "embedding", "extracting_requirements", "evaluating"] as const;
-const STAGE_WEIGHTS = { extracting: 10, embedding: 20, extracting_requirements: 20, evaluating: 50 } as const;
+const STAGE_ORDER = ["extracting", "extracting_requirements", "embedding", "evaluating"] as const;
+const STAGE_WEIGHTS = { extracting: 10, extracting_requirements: 20, embedding: 20, evaluating: 50 } as const;
 const STAGES = STAGE_ORDER.map((s) => ({ key: s, label: STATUS[s] }));
 
 /* ─── Utilities ─────────────────────────────────────────────────────────── */
@@ -73,15 +76,27 @@ export default function ScreeningModule() {
 
 function ScreeningInner() {
   const { toast } = useToast();
-  const [phase, setPhase] = useState<"setup" | "running" | "results">("setup");
+
+  // A screening run keeps executing on the server even after we navigate away —
+  // only the polling stops. We persist its id (plus the JD selection) so we can
+  // re-attach and keep showing live progress when the user returns.
+  const saved = loadSession(SESSION_KEYS.screening, {
+    phase: "setup" as "setup" | "running" | "results",
+    runId: "", jdMode: "repo" as "repo" | "upload", jdId: "" as number | "", topK: 10,
+  });
+
+  const [phase, setPhase] = useState<"setup" | "running" | "results">(
+    saved.runId ? saved.phase : "setup",
+  );
   const [error, setError] = useState("");
   const [resumes, setResumes] = useState<File[]>([]);
-  const [jdMode, setJdMode] = useState<"repo" | "upload">("repo");
+  const [jdMode, setJdMode] = useState<"repo" | "upload">(saved.jdMode);
   const [jds, setJds] = useState<JdRecord[]>([]);
-  const [jdId, setJdId] = useState<number | "">("");
+  const [jdId, setJdId] = useState<number | "">(saved.jdId);
   const [jdFile, setJdFile] = useState<File | null>(null);
-  const [topK, setTopK] = useState(10);
+  const [topK, setTopK] = useState(saved.topK);
   const [run, setRun] = useState<ScreeningRun | null>(null);
+  const [runId, setRunId] = useState(saved.runId);
 
   const pollRef = useRef<number | undefined>(undefined);
   const genRef = useRef(0);
@@ -90,6 +105,38 @@ function ScreeningInner() {
     jdApi.list().then(setJds).catch(() => setJds([]));
     return () => { genRef.current++; if (pollRef.current) window.clearTimeout(pollRef.current); };
   }, []);
+
+  // Re-attach to an in-flight (or finished) run after returning to this page.
+  useEffect(() => {
+    if (!saved.runId || saved.phase === "setup") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await screening.get(saved.runId);
+        if (cancelled) return;
+        setRun(r);
+        if (r.status === "complete" || r.status === "error") setPhase("results");
+        else { setPhase("running"); poll(saved.runId); }
+      } catch {
+        if (cancelled) return;
+        // Run is gone (server restart / expired) — fall back to a clean setup.
+        clearSession(SESSION_KEYS.screening);
+        setRunId(""); setPhase("setup");
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist the run handle + JD selection; warn before leaving while running.
+  useEffect(() => {
+    saveSession(SESSION_KEYS.screening, { phase, runId, jdMode, jdId, topK });
+  }, [phase, runId, jdMode, jdId, topK]);
+
+  useEffect(() => {
+    setBusy(phase === "running");
+    return () => setBusy(false);
+  }, [phase]);
 
   function processIncoming(incoming: File[]) {
     const keys = new Set(resumes.map(fileKey));
@@ -135,7 +182,7 @@ function ScreeningInner() {
         jdId: jdMode === "repo" ? Number(jdId) : undefined,
         jdFiles: jdMode === "upload" && jdFile ? [jdFile] : undefined,
       });
-      setRun(null); setPhase("running"); poll(run_id);
+      setRun(null); setRunId(run_id); setPhase("running"); poll(run_id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start the screening.");
     }
@@ -163,7 +210,8 @@ function ScreeningInner() {
   function reset() {
     genRef.current++;
     if (pollRef.current) window.clearTimeout(pollRef.current);
-    setPhase("setup"); setRun(null); setResumes([]); setError("");
+    clearSession(SESSION_KEYS.screening);
+    setPhase("setup"); setRun(null); setRunId(""); setResumes([]); setError("");
   }
 
   function runProgress(): number {

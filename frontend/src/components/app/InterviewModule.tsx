@@ -8,6 +8,7 @@ import {
   Banner, PhaseProgress,
 } from "./ui";
 import { UploadZone } from "./UploadZone";
+import { loadSession, saveSession, clearSession, setBusy, SESSION_KEYS } from "@/lib/session";
 import {
   interview,
   jd as jdApi,
@@ -27,38 +28,51 @@ const LEVELS = [
 ];
 
 export default function InterviewModule() {
-  const [phase, setPhase] = useState<Phase>("setup");
+  // The interview thread lives on the server, keyed by thread_id. Persisting the
+  // session state lets the user navigate away mid-interview and return to the
+  // same question; a lost thread surfaces as a 409 on the next submit (handled).
+  const saved = loadSession(SESSION_KEYS.interview, {
+    phase: "setup" as Phase, candidate: "", role: "", level: "mid", maxQ: 5,
+    jdMode: "repo" as "repo" | "upload", jdId: "" as number | "", jdText: "", jdFile: "",
+    resumeText: "", resumeFile: "", threadId: "", question: null as PlannedQuestion | null,
+    asked: 0, total: 0, transcript: [] as InterviewTurn[], report: null as FinalReport | null,
+  });
+  const restorable =
+    (saved.phase === "running" && !!saved.threadId && !!saved.question) ||
+    (saved.phase === "done" && !!saved.report);
+
+  const [phase, setPhase] = useState<Phase>(restorable ? saved.phase : "setup");
   const [error, setError] = useState("");
 
   // setup state
-  const [candidate, setCandidate] = useState("");
-  const [role, setRole] = useState("");
-  const [level, setLevel] = useState("mid");
-  const [maxQ, setMaxQ] = useState(5);
+  const [candidate, setCandidate] = useState(saved.candidate);
+  const [role, setRole] = useState(saved.role);
+  const [level, setLevel] = useState(saved.level);
+  const [maxQ, setMaxQ] = useState(saved.maxQ);
   const [jds, setJds] = useState<JdRecord[]>([]);
-  const [jdMode, setJdMode] = useState<"repo" | "upload">("repo");
-  const [jdId, setJdId] = useState<number | "">("");
-  const [jdText, setJdText] = useState("");
-  const [jdFile, setJdFile] = useState("");
+  const [jdMode, setJdMode] = useState<"repo" | "upload">(saved.jdMode);
+  const [jdId, setJdId] = useState<number | "">(saved.jdId);
+  const [jdText, setJdText] = useState(saved.jdText);
+  const [jdFile, setJdFile] = useState(saved.jdFile);
   const [jdExtracting, setJdExtracting] = useState(false);
-  const [resumeText, setResumeText] = useState("");
-  const [resumeFile, setResumeFile] = useState("");
+  const [resumeText, setResumeText] = useState(saved.resumeText);
+  const [resumeFile, setResumeFile] = useState(saved.resumeFile);
   const [extracting, setExtracting] = useState(false);
   const [starting, setStarting] = useState(false);
 
   // running state
-  const [threadId, setThreadId] = useState("");
-  const [question, setQuestion] = useState<PlannedQuestion | null>(null);
+  const [threadId, setThreadId] = useState(saved.threadId);
+  const [question, setQuestion] = useState<PlannedQuestion | null>(saved.question);
   const [answer, setAnswer] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [recording, setRecording] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
-  const [asked, setAsked] = useState(0); // questions presented so far
-  const [total, setTotal] = useState(0); // questions the model actually planned
-  const [transcript, setTranscript] = useState<InterviewTurn[]>([]);
+  const [asked, setAsked] = useState(saved.asked); // questions presented so far
+  const [total, setTotal] = useState(saved.total); // questions the model actually planned
+  const [transcript, setTranscript] = useState<InterviewTurn[]>(saved.transcript);
 
   // done state
-  const [report, setReport] = useState<FinalReport | null>(null);
+  const [report, setReport] = useState<FinalReport | null>(saved.report);
 
   const answerRef = useRef<HTMLTextAreaElement>(null);
   // Web Speech API recognizer (browser STT); typed loosely as it is not in lib.dom for all targets.
@@ -71,6 +85,20 @@ export default function InterviewModule() {
       .then(setJds)
       .catch(() => setJds([]));
   }, []);
+
+  // Persist the interview so navigating away mid-session restores the same question.
+  useEffect(() => {
+    saveSession(SESSION_KEYS.interview, {
+      phase, candidate, role, level, maxQ, jdMode, jdId, jdText, jdFile,
+      resumeText, resumeFile, threadId, question, asked, total, transcript, report,
+    });
+  }, [phase, candidate, role, level, maxQ, jdMode, jdId, jdText, jdFile, resumeText, resumeFile, threadId, question, asked, total, transcript, report]);
+
+  // Warn before leaving while an interview is live or being planned.
+  useEffect(() => {
+    setBusy(phase === "running" || starting);
+    return () => setBusy(false);
+  }, [phase, starting]);
 
   // Detect browser speech-to-text support; abort any live recognizer on unmount.
   useEffect(() => {
@@ -264,6 +292,7 @@ export default function InterviewModule() {
     setAsked(0);
     setTotal(0);
     setError("");
+    clearSession(SESSION_KEYS.interview);
   }
 
   return (

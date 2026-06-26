@@ -25,6 +25,18 @@ export default function MobileNav({
 }) {
   const [open, setOpen] = useState(false);
 
+  // Honour the in-progress-work guard before following a link (work is also
+  // persisted to sessionStorage, so this is a courtesy confirmation).
+  function guardedNav(e: React.MouseEvent) {
+    if ((window as unknown as { __MEDHA_BUSY__?: boolean }).__MEDHA_BUSY__) {
+      const ok = window.confirm(
+        "This tool is still working. Your progress is saved and will be restored when you come back. Leave this page now?",
+      );
+      if (!ok) { e.preventDefault(); return; }
+    }
+    setOpen(false);
+  }
+
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger
@@ -57,7 +69,7 @@ export default function MobileNav({
                 key={l.key}
                 href={l.href}
                 aria-current={isActive ? "page" : undefined}
-                onClick={() => setOpen(false)}
+                onClick={guardedNav}
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                   isActive
@@ -75,7 +87,7 @@ export default function MobileNav({
         <div className="mt-auto border-t border-sidebar-border px-3 py-3">
           <a
             href="/"
-            onClick={() => setOpen(false)}
+            onClick={guardedNav}
             className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
           >
             <Home className="size-[18px] shrink-0" />

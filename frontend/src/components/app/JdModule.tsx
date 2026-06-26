@@ -11,6 +11,7 @@ import {
   SurfaceCard, SegmentedControl, Banner, EmptyState, ErrorState, Skeleton,
 } from "./ui";
 import { ToastProvider, useToast } from "./toast";
+import { loadSession, saveSession, clearSession, setBusy, SESSION_KEYS } from "@/lib/session";
 import { jd as jdApi, type JdFields, type JdRecord } from "@/lib/api";
 
 /* Common roles and locations for a construction / engineering org. "Others"
@@ -84,25 +85,33 @@ export default function JdModule() {
 
 function JdModuleInner() {
   const { toast } = useToast();
-  const [tab, setTab] = useState<"generate" | "repository">("generate");
+
+  // Restore any in-progress generation from a previous visit this tab session.
+  const saved = loadSession(SESSION_KEYS.jd, {
+    tab: "generate" as "generate" | "repository",
+    fields: EMPTY, roleChoice: "", roleCustom: "", locChoice: "Hyderabad",
+    locCustom: "", expMin: "", expMax: "", body: "", showPreview: false, editing: false,
+  });
+
+  const [tab, setTab] = useState<"generate" | "repository">(saved.tab);
   const [error, setError] = useState("");
 
   // generate
-  const [fields, setFields] = useState<JdFields>(EMPTY);
-  const [roleChoice, setRoleChoice] = useState("");
-  const [roleCustom, setRoleCustom] = useState("");
-  const [locChoice, setLocChoice] = useState("Hyderabad");
-  const [locCustom, setLocCustom] = useState("");
-  const [expMin, setExpMin] = useState("");
-  const [expMax, setExpMax] = useState("");
+  const [fields, setFields] = useState<JdFields>(saved.fields);
+  const [roleChoice, setRoleChoice] = useState(saved.roleChoice);
+  const [roleCustom, setRoleCustom] = useState(saved.roleCustom);
+  const [locChoice, setLocChoice] = useState(saved.locChoice);
+  const [locCustom, setLocCustom] = useState(saved.locCustom);
+  const [expMin, setExpMin] = useState(saved.expMin);
+  const [expMax, setExpMax] = useState(saved.expMax);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [body, setBody] = useState("");
-  const [editing, setEditing] = useState(false);
+  const [body, setBody] = useState(saved.body);
+  const [editing, setEditing] = useState(saved.editing);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [showPreview, setShowPreview] = useState(false); // hidden until Generate
+  const [showPreview, setShowPreview] = useState(saved.showPreview); // hidden until Generate
   const [genError, setGenError] = useState("");          // generation failure, shown inside the preview
   const [genSeq, setGenSeq] = useState(0);               // bumped each run so the slide-in replays
   const [generatingSkills, setGeneratingSkills] = useState(false);
@@ -147,6 +156,20 @@ function JdModuleInner() {
     else if (max) set("experience", `Up to ${max} years`);
     else set("experience", "");
   }, [expMin, expMax]);
+
+  // Persist the in-progress generation so navigating away and back restores it.
+  useEffect(() => {
+    saveSession(SESSION_KEYS.jd, {
+      tab, fields, roleChoice, roleCustom, locChoice, locCustom,
+      expMin, expMax, body, showPreview, editing,
+    });
+  }, [tab, fields, roleChoice, roleCustom, locChoice, locCustom, expMin, expMax, body, showPreview, editing]);
+
+  // Warn before leaving while a generation is running.
+  useEffect(() => {
+    setBusy(generating || generatingSkills || generatingResponsibilities);
+    return () => setBusy(false);
+  }, [generating, generatingSkills, generatingResponsibilities]);
 
   async function loadList(q = "") {
     setLoadingList(true);
@@ -249,6 +272,7 @@ function JdModuleInner() {
       setRoleChoice(""); setRoleCustom(""); setLocChoice("Hyderabad"); setLocCustom("");
       setExpMin(""); setExpMax(""); setFieldErrors({});
       setEditing(false); setExpanded(false); setShowPreview(false); setGenError("");
+      clearSession(SESSION_KEYS.jd);
       await loadList();
       setSelected(rec);
       setTab("repository");

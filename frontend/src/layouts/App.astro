@@ -58,6 +58,7 @@ const homeIcon = '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><pol
           {links.map((l) => (
             <a
               href={l.href}
+              data-navguard
               aria-current={active === l.key ? "page" : undefined}
               title={l.label}
               class={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors max-md:justify-center md:justify-center lg:justify-start ${
@@ -88,6 +89,7 @@ const homeIcon = '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><pol
         <div class="mt-auto border-t border-sidebar-border px-2 py-3 lg:px-3">
           <a
             href="/"
+            data-navguard
             title="Back to home"
             class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground md:justify-center lg:justify-start"
           >
@@ -129,5 +131,19 @@ const homeIcon = '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><pol
         </main>
       </div>
     </div>
+
+    <!-- Navigation guard: if a tool reports in-progress work (window.__MEDHA_BUSY__),
+         confirm before following a sidebar link. Work is also saved to sessionStorage,
+         so the warning is a courtesy, not the safety net. -->
+    <script is:inline>
+      document.addEventListener("click", (e) => {
+        const a = e.target.closest("a[data-navguard]");
+        if (!a || !window.__MEDHA_BUSY__) return;
+        const ok = window.confirm(
+          "This tool is still working. Your progress is saved and will be restored when you come back. Leave this page now?"
+        );
+        if (!ok) e.preventDefault();
+      }, true);
+    </script>
   </body>
 </html>

@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import logging
 import uuid
 from contextlib import asynccontextmanager
@@ -42,6 +43,10 @@ async def _lifespan(app: FastAPI):
 app = FastAPI(title="AI Resume Screening & Scoring System", lifespan=_lifespan)
 
 RUNS: dict[str, dict] = {}
+
+# Cache of extracted JD requirements keyed by MD5 of the JD text.
+# Avoids a ~40s LLM call when the same JD is screened multiple times.
+_JD_REQUIREMENTS_CACHE: dict[str, dict] = {}
 
 # Strong references to in-flight pipeline tasks. asyncio keeps only a weak ref to
 # bare create_task() results, so without this a running screening can be GC'd
@@ -466,7 +471,18 @@ async def _run_pipeline(
             raise ValueError("No readable resumes in the selected folder")
         jd_text = "\n\n---\n\n".join(jd_parts)
 
-        # Stage 1: embed JD + resumes, shortlist by cosine similarity
+        # Stage 1: parse the JD into structured requirements first — the rest of the
+        # pipeline (shortlist + scoring) is matched against these. Cached by JD
+        # content hash so repeated runs skip this ~40s LLM call.
+        run["status"] = "extracting_requirements"
+        jd_hash = hashlib.md5(jd_text.encode()).hexdigest()
+        if jd_hash not in _JD_REQUIREMENTS_CACHE:
+            _JD_REQUIREMENTS_CACHE[jd_hash] = await extract_jd_requirements(jd_text)
+        requirements = _JD_REQUIREMENTS_CACHE[jd_hash]
+        run["jd_requirements"] = requirements
+
+        # Stage 2: embed JD + resumes, shortlist the closest matches by cosine
+        # similarity so only the strongest candidates go to in-depth LLM scoring.
         run["status"] = "embedding"
         vectors = await embed_texts([jd_text] + [f["text"] for f in files])
         store = VectorStore(vectors[1:])
@@ -485,11 +501,6 @@ async def _run_pipeline(
                 "overall_score": None,
                 "recommendation": None if i in shortlist else "Not shortlisted",
             })
-
-        # Stage 2: extract JD requirements once, then LLM-evaluate the shortlist
-        run["status"] = "extracting_requirements"
-        requirements = await extract_jd_requirements(jd_text)
-        run["jd_requirements"] = requirements
 
         run["status"] = "evaluating"
         semaphore = asyncio.Semaphore(config.MAX_CONCURRENT_EVALS)
