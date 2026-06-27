@@ -5,19 +5,21 @@ import MobileNav from "@/components/app/MobileNav";
 interface Props {
   title?: string;
   description?: string;
-  active?: "jd" | "screening" | "interview" | "";
+  active?: "jd" | "screening" | "interview" | "dashboard" | "";
 }
 const { title = "MEDHA", description = "", active = "" } = Astro.props;
 
 const links = [
+  { key: "dashboard", label: "Dashboard", href: "/dashboard" },
   { key: "jd", label: "JD Generation", href: "/jd" },
   { key: "screening", label: "CV Analyzer", href: "/screening" },
   { key: "interview", label: "AI Interview", href: "/interview" },
 ];
 
-// Lucide icon paths (FileText / ScanSearch / Bot), inlined for the static Astro
-// sidebar. The mobile drawer island maps the same keys to lucide-react components.
+// Lucide icon paths, inlined for the static Astro sidebar. The mobile drawer island
+// maps the same keys to lucide-react components.
 const icons: Record<string, string> = {
+  dashboard: '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>',
   jd: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
   screening: '<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/><path d="m16 16-1.9-1.9"/>',
   interview: '<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>',

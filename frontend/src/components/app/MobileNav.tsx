@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Menu, FileText, ScanSearch, Bot, Home } from "lucide-react";
+import { Menu, FileText, ScanSearch, Bot, Home, LayoutDashboard } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
    a serializable key string because Astro can't pass React components as props. */
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  dashboard: LayoutDashboard,
   jd: FileText,
   screening: ScanSearch,
   interview: Bot,
