@@ -465,3 +465,87 @@ export function PhaseProgress({
     </div>
   );
 }
+
+/* ──────────────────────────────── Stepper ────────────────────────────── */
+
+/* Numbered step indicator for a phase-driven flow. Numbers are 1-indexed. */
+export function Stepper({
+  steps,
+  current,
+  className,
+}: {
+  steps: string[];
+  current: number;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex items-center gap-2 text-sm font-medium text-muted-foreground", className)}>
+      {steps.map((step, i) => {
+        const num = i + 1;
+        const active = num === current;
+        const done = num < current;
+        return (
+          <div key={i} className="flex items-center gap-2">
+            <span
+              className={cn(
+                "inline-flex size-7 items-center justify-center rounded-full text-xs font-bold transition-colors",
+                active ? "bg-primary text-primary-foreground" : done ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground",
+              )}
+            >
+              {done ? <Check className="size-4" /> : num}
+            </span>
+            <span className={cn("hidden sm:inline", active || done ? "text-foreground" : "")}>{step}</span>
+            {i < steps.length - 1 && <span className={cn("mx-1 hidden h-px w-3 sm:block", active || done ? "bg-primary" : "bg-border")} />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ──────────────────────────────── SelectCard ────────────────────────────── */
+
+/* Large mode-select card for a prominent binary or ternary choice in a flow. */
+export function SelectCard({
+  value,
+  onChange,
+  options,
+  className,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: Array<{ value: string; label: string; description?: string; icon?: React.ReactNode }>;
+  className?: string;
+}) {
+  return (
+    <div className={cn("grid gap-3", className)}>
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          onClick={() => onChange(opt.value)}
+          className={cn(
+            "flex items-center gap-3 rounded-xl border-2 px-4 py-3.5 text-left transition-all",
+            value === opt.value
+              ? "border-primary bg-primary/5"
+              : "border-border bg-background hover:border-primary/50 hover:bg-muted/50",
+          )}
+        >
+          {opt.icon && <span className="text-primary">{opt.icon}</span>}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-foreground">{opt.label}</p>
+            {opt.description && <p className="mt-0.5 text-xs text-muted-foreground">{opt.description}</p>}
+          </div>
+          <span
+            className={cn(
+              "inline-flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+              value === opt.value ? "border-primary bg-primary" : "border-border",
+            )}
+          >
+            {value === opt.value && <Check className="size-3.5 text-primary-foreground" />}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}

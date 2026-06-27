@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import {
   Dropdown, PageHeader, Spinner, inputCls,
   SurfaceCard, SectionTitle, SegmentedControl, StatusChip, matchTone,
-  ScoreMeter, StatTile, Banner, ErrorState, PhaseProgress,
+  ScoreMeter, StatTile, Banner, ErrorState, PhaseProgress, Stepper,
 } from "./ui";
 import { ToastProvider, useToast } from "./toast";
 import { UploadZone } from "./UploadZone";
@@ -498,6 +498,7 @@ function Results({ run, resumes, onReset }: { run: ScreeningRun; resumes: File[]
 
   return (
     <div>
+      <Stepper steps={["Upload", "Configure", "Results"]} current={3} className="mb-6" />
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-heading text-xl font-bold tracking-tight">Results</h2>

@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import {
   Dropdown, Field, PageHeader, Spinner, inputCls,
   SurfaceCard, SectionTitle, SegmentedControl, StatusChip, hireTone, matchTone, ScoreMeter,
-  Banner, PhaseProgress, EmptyState,
+  Banner, PhaseProgress, EmptyState, Stepper, SelectCard,
 } from "./ui";
 import { UploadZone } from "./UploadZone";
 import { loadSession, saveSession, clearSession, setBusy, SESSION_KEYS } from "@/lib/session";
@@ -386,13 +386,15 @@ export default function InterviewModule() {
 
       {phase === "setup" && (
         <div className="space-y-5">
-          <SegmentedControl
+          <Stepper steps={["Pick", "Interview", "Report"]} current={1} className="mb-2" />
+          <SelectCard
             value={source}
-            onChange={setSource}
+            onChange={(v) => setSource(v as "screening" | "manual")}
             options={[
-              { value: "screening", label: "From screening" },
-              { value: "manual", label: "Manual" },
+              { value: "screening", label: "From screening", description: "Pick from shortlisted candidates", icon: <ScanSearch className="size-5" /> },
+              { value: "manual", label: "Manual", description: "Upload role, JD, and resume", icon: <Upload className="size-5" /> },
             ]}
+            className="mb-4"
           />
 
           {source === "screening" ? (
@@ -578,8 +580,9 @@ export default function InterviewModule() {
       )}
 
       {phase === "running" && question && (
-        <div className="mx-auto max-w-3xl">
-          <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="mx-auto max-w-3xl space-y-6">
+          <Stepper steps={["Pick", "Interview", "Report"]} current={2} />
+          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium capitalize text-muted-foreground">
                 {question.round}
@@ -646,17 +649,20 @@ export default function InterviewModule() {
       )}
 
       {phase === "done" && report && (
-        <Report
-          report={report}
-          transcript={transcript}
-          candidate={candidate.trim() || "Candidate"}
+        <div className="space-y-6">
+          <Stepper steps={["Pick", "Interview", "Report"]} current={3} />
+          <Report
+            report={report}
+            transcript={transcript}
+            candidate={candidate.trim() || "Candidate"}
           onRestart={source === "screening" ? nextCandidate : reset}
           restartLabel={
             source === "screening"
               ? (screeningDone < screeningTotal ? "Next candidate" : "Back to shortlist")
               : "Start another interview"
           }
-        />
+          />
+        </div>
       )}
     </div>
   );
