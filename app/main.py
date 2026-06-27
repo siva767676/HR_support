@@ -19,6 +19,7 @@ from . import (
     notifications,
     reporting,
     scoring,
+    store,
 )
 from .embeddings import embed_texts
 from .evaluator import (
@@ -250,6 +251,8 @@ async def create_screening(
         "id": run_id,
         "status": "extracting",
         "jd_name": jd_name,
+        "jd_id": jd_id,          # for forwarding shortlisted candidates to the interview
+        "role": jd_name,         # role label used downstream; jd title for repo JDs
         "total": len(resume_sources),
         "shortlisted": 0,
         "evaluated": 0,
@@ -274,7 +277,7 @@ async def get_screening(run_id: str):
     if run is None:
         raise HTTPException(404, "Unknown run id")
     view = dict(run)
-    view["results"] = sorted(
+    ordered = sorted(
         run["results"],
         key=lambda r: (
             r["overall_score"] is not None,
@@ -283,7 +286,45 @@ async def get_screening(run_id: str):
         ),
         reverse=True,
     )
+    # resume_text is retained server-side for forwarding only — never sent to the live table.
+    view["results"] = [{k: v for k, v in r.items() if k != "resume_text"} for r in ordered]
     return view
+
+
+@app.get("/api/screenings/{run_id}/shortlist")
+async def get_shortlist(run_id: str):
+    """Shortlisted candidates of a completed run, for forwarding to the AI Interview.
+
+    Reads the persisted run (survives the in-memory cap + restarts), falling back to
+    the live RUNS dict. resume_text is intentionally omitted — interview/start looks
+    it up server-side by run_id + candidate_key."""
+    persisted = store.get_screening_run(run_id)
+    run = persisted or RUNS.get(run_id)
+    if run is None:
+        raise HTTPException(404, "Unknown run id")
+    done = store.completed_candidate_keys(run_id)
+    candidates = []
+    for r in run.get("results", []):
+        if not r.get("shortlisted"):
+            continue
+        candidates.append({
+            "candidate_key": r["filename"],
+            "candidate_name": r.get("candidate_name") or r["filename"],
+            "candidate_email": r.get("candidate_email"),
+            "overall_score": r.get("overall_score"),
+            "recommendation": r.get("recommendation"),
+            "has_resume": bool((r.get("resume_text") or "").strip()),
+            "interviewed": r["filename"] in done,
+        })
+    candidates.sort(key=lambda c: (c["overall_score"] is None, -(c["overall_score"] or 0)))
+    return {
+        "run_id": run_id,
+        "jd_id": run.get("jd_id"),
+        "jd_name": run.get("jd_name", ""),
+        "role": run.get("role") or run.get("jd_name", ""),
+        "jd_text": run.get("jd_text", ""),
+        "candidates": candidates,
+    }
 
 
 @app.get("/api/screenings/{run_id}/report.xlsx")
@@ -374,19 +415,42 @@ async def list_run_notifications(run_id: str):
 async def interview_start(payload: dict = Body(...)):
     """Plan a tailored interview from a role + JD + resume text; return question 1.
 
-    In-memory only (nothing is stored): the returned thread_id is valid until the
-    process restarts. Voice/avatar are out of scope; this is the text engine.
+    Two modes:
+    - Manual: role + job_description + resume_text supplied directly.
+    - From screening: run_id + candidate_key supplied; role/JD/resume are resolved
+      server-side from the persisted screening run (no re-upload needed).
+
+    A completed interview is persisted (Dashboard); the in-memory thread itself is
+    valid only until the process restarts (then submit_answer raises 409).
     """
+    run_id = (payload.get("run_id") or "").strip() or None
+    candidate_key = (payload.get("candidate_key") or "").strip() or None
     role = (payload.get("role") or "").strip()
     jd = (payload.get("job_description") or "").strip()
     resume = (payload.get("resume_text") or "").strip()
+    name = (payload.get("candidate_name") or "Candidate").strip()
+    email = (payload.get("candidate_email") or "").strip() or None
+
+    # Resolve role/JD/resume from the persisted screening run when forwarding.
+    if run_id and candidate_key:
+        srun = store.get_screening_run(run_id)
+        if not srun:
+            raise HTTPException(404, "Screening run not found")
+        cand = next((r for r in srun.get("results", []) if r.get("filename") == candidate_key), None)
+        if not cand:
+            raise HTTPException(404, "Candidate not found in that screening run")
+        role = role or srun.get("role") or srun.get("jd_name", "")
+        jd = jd or srun.get("jd_text", "")
+        resume = resume or (cand.get("resume_text") or "")
+        name = (payload.get("candidate_name") or cand.get("candidate_name") or candidate_key).strip()
+        email = email or cand.get("candidate_email")
+
     if not role:
         raise HTTPException(400, "A role is required to start an interview")
     if not jd:
         raise HTTPException(400, "A job description is required to start an interview")
     if not resume:
         raise HTTPException(400, "Candidate resume text is required to start an interview")
-    name = (payload.get("candidate_name") or "Candidate").strip()
     try:
         result = await interview_service.start_interview(
             candidate_name=name,
@@ -399,6 +463,17 @@ async def interview_start(payload: dict = Body(...)):
         )
     except Exception as exc:  # noqa: BLE001 - surface a clean message to the UI
         raise HTTPException(502, f"Could not start interview: {exc}")
+
+    # Record the interview for the Dashboard (never let a DB error fail the start).
+    try:
+        iid = store.create_interview(
+            run_id=run_id, candidate_key=candidate_key,
+            candidate_name=name, candidate_email=email, role=role,
+        )
+        store.attach_thread(iid, result["thread_id"])
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Could not record interview start: %s", exc)
+
     return {**result, "role": role, "candidate_name": name}
 
 
@@ -429,13 +504,39 @@ async def interview_answer(payload: dict = Body(...)):
     if not thread_id:
         raise HTTPException(400, "thread_id is required")
     try:
-        return await interview_service.submit_answer(thread_id, payload.get("answer") or "")
+        result = await interview_service.submit_answer(thread_id, payload.get("answer") or "")
     except interview_service.InterviewExpired:
+        try:
+            store.expire_interview(thread_id)
+        except Exception:  # noqa: BLE001
+            pass
         raise HTTPException(
             409, "This interview session has expired. Please start a new interview."
         )
     except Exception as exc:  # noqa: BLE001 - surface a clean message to the UI
         raise HTTPException(502, f"Could not process answer: {exc}")
+
+    # Persist the final report when the interview finishes (for the Dashboard).
+    if result.get("done") and result.get("report"):
+        try:
+            store.complete_interview(thread_id, result["report"])
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not persist interview report: %s", exc)
+    return result
+
+
+# ============================ Dashboard ============================
+
+@app.get("/api/screening-runs")
+async def list_screening_runs(limit: int = 50):
+    """Persisted screening-run summaries for the Dashboard."""
+    return {"runs": store.list_screening_runs(limit)}
+
+
+@app.get("/api/interviews")
+async def list_interviews(limit: int = 100):
+    """Persisted interview outcomes for the Dashboard."""
+    return {"interviews": store.list_interviews(limit)}
 
 
 async def _run_pipeline(
@@ -485,8 +586,8 @@ async def _run_pipeline(
         # similarity so only the strongest candidates go to in-depth LLM scoring.
         run["status"] = "embedding"
         vectors = await embed_texts([jd_text] + [f["text"] for f in files])
-        store = VectorStore(vectors[1:])
-        similarity = dict(store.search(vectors[0], k=len(files)))
+        vstore = VectorStore(vectors[1:])
+        similarity = dict(vstore.search(vectors[0], k=len(files)))
 
         order = sorted(range(len(files)), key=lambda i: similarity.get(i, 0.0), reverse=True)
         shortlist = set(order[:top_k])
@@ -500,6 +601,9 @@ async def _run_pipeline(
                 "shortlisted": i in shortlist,
                 "overall_score": None,
                 "recommendation": None if i in shortlist else "Not shortlisted",
+                # Retained for forwarding to the interview (shortlisted only, clipped);
+                # stripped from the live polling response in get_screening.
+                "resume_text": f["text"][: config.MAX_DOC_CHARS] if i in shortlist else None,
             })
 
         run["status"] = "evaluating"
@@ -572,6 +676,13 @@ async def _run_pipeline(
         ]
         await asyncio.gather(*(evaluate_batch(batch) for batch in batches))
         run["status"] = "complete"
+        # Persist the completed run (with shortlisted resume_text) so the Dashboard and
+        # the screening->interview hand-off survive the in-memory cap and restarts.
+        # A DB failure must never flip a successful run to error.
+        try:
+            store.save_screening_run(run, run.get("jd_id"), run.get("role", ""), jd_text)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not persist screening run %s: %s", run_id, exc)
     except Exception as exc:
         run["status"] = "error"
         run["error"] = str(exc)

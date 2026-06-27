@@ -53,6 +53,42 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 """
 
+# Pipeline persistence: completed screening runs and the interviews forwarded from
+# them, so the Dashboard survives a server restart (the in-memory RUNS / interview
+# _SESSIONS do not). results_json keeps each candidate's resume_text for SHORTLISTED
+# rows only (clipped) so a forwarded interview can be started without re-upload.
+_SCHEMA += """
+CREATE TABLE IF NOT EXISTS screening_runs (
+    run_id       TEXT PRIMARY KEY,
+    jd_id        INTEGER,
+    jd_name      TEXT NOT NULL,
+    role         TEXT,
+    jd_text      TEXT,
+    total        INTEGER NOT NULL DEFAULT 0,
+    shortlisted  INTEGER NOT NULL DEFAULT 0,
+    status       TEXT NOT NULL DEFAULT 'complete',
+    results_json TEXT NOT NULL,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS interviews (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    thread_id      TEXT,
+    run_id         TEXT,
+    candidate_key  TEXT,
+    candidate_name TEXT,
+    candidate_email TEXT,
+    role           TEXT,
+    status         TEXT NOT NULL DEFAULT 'in_progress',
+    overall_score  INTEGER,
+    recommendation TEXT,
+    report_json    TEXT,
+    created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_interviews_run ON interviews(run_id);
+CREATE INDEX IF NOT EXISTS idx_interviews_thread ON interviews(thread_id);
+"""
+
 # Columns added after the first schema version — applied to pre-existing DBs.
 _MIGRATIONS = {"jds": {"location": "TEXT", "reporting": "TEXT"}}
 
