@@ -620,13 +620,13 @@ function Footer() {
               Get in Touch
             </a>
             <div className="mt-4 flex items-center gap-2.5">
-              <a aria-label="Instagram" href="#" className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-tr from-[#feda75] via-[#d62976] to-[#4f5bd5] text-white transition-transform hover:scale-105">
+              <a aria-label="Instagram" href="https://www.instagram.com/myhomeconstructions_?igsh=bHpyczdyb2VzNThr" target="_blank" rel="noopener noreferrer" className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-tr from-[#feda75] via-[#d62976] to-[#4f5bd5] text-white transition-transform hover:scale-105">
                 <IgIcon className="size-4" />
               </a>
-              <a aria-label="LinkedIn" href="#" className="flex size-9 items-center justify-center rounded-xl bg-[#0A66C2] text-white transition-transform hover:scale-105">
+              <a aria-label="LinkedIn" href="https://www.linkedin.com/company/my-home-constructions/" target="_blank" rel="noopener noreferrer" className="flex size-9 items-center justify-center rounded-xl bg-[#0A66C2] text-white transition-transform hover:scale-105">
                 <LiIcon className="size-4" />
               </a>
-              <a aria-label="MY HOME GROUP" href="#" className="flex size-9 items-center justify-center rounded-xl bg-white ring-1 ring-white/10 transition-transform hover:scale-105 overflow-hidden px-1">
+              <a aria-label="MY HOME GROUP" href="https://www.myhomeconstructions.com/" target="_blank" rel="noopener noreferrer" className="flex size-9 items-center justify-center rounded-xl bg-white ring-1 ring-white/10 transition-transform hover:scale-105 overflow-hidden px-1">
                 <img src="/myhomegroup-logo.png" alt="MY HOME GROUP" className="h-4 w-auto" />
               </a>
             </div>
