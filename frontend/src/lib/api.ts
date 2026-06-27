@@ -119,6 +119,25 @@ export interface ScreeningInput {
   jdFiles?: File[];
 }
 
+export interface ShortlistCandidate {
+  candidate_key: string;
+  candidate_name: string;
+  candidate_email?: string | null;
+  overall_score: number | null;
+  recommendation: string | null;
+  has_resume: boolean;
+  interviewed: boolean;
+}
+
+export interface Shortlist {
+  run_id: string;
+  jd_id: number | null;
+  jd_name: string;
+  role: string;
+  jd_text: string;
+  candidates: ShortlistCandidate[];
+}
+
 export const screening = {
   create: ({ resumes, topK, jdId, jdFiles }: ScreeningInput) => {
     const form = new FormData();
@@ -129,6 +148,7 @@ export const screening = {
     return req<{ run_id: string; total: number }>("/screenings", { method: "POST", body: form });
   },
   get: (runId: string) => req<ScreeningRun>(`/screenings/${runId}`),
+  shortlist: (runId: string) => req<Shortlist>(`/screenings/${runId}/shortlist`),
   reportUrl: (runId: string) => `${BASE}/screenings/${runId}/report.xlsx`,
 };
 
@@ -172,11 +192,15 @@ export interface FinalReport {
 
 export interface InterviewStartInput {
   candidate_name?: string;
-  role: string;
+  candidate_email?: string;
+  role?: string;
   experience_level?: string;
-  resume_text: string;
-  job_description: string;
+  resume_text?: string;
+  job_description?: string;
   max_questions?: number;
+  // From-screening mode: role/JD/resume are resolved server-side from the run.
+  run_id?: string;
+  candidate_key?: string;
 }
 
 export interface InterviewStartResponse {
@@ -200,6 +224,45 @@ export const interview = {
   start: (input: InterviewStartInput) => req<InterviewStartResponse>("/interview/start", json(input)),
   answer: (threadId: string, answer: string) =>
     req<InterviewAnswerResponse>("/interview/answer", json({ thread_id: threadId, answer })),
+};
+
+/* --------------------------------- Dashboard ------------------------------- */
+
+export interface ScreeningRunSummary {
+  run_id: string;
+  jd_id: number | null;
+  jd_name: string;
+  role: string | null;
+  total: number;
+  shortlisted: number;
+  status: string;
+  created_at: string;
+  interviewed_count: number;
+}
+
+export interface InterviewRecord {
+  id: number;
+  thread_id: string | null;
+  run_id: string | null;
+  candidate_key: string | null;
+  candidate_name: string;
+  candidate_email?: string | null;
+  role: string | null;
+  status: "in_progress" | "completed" | "expired";
+  overall_score: number | null;
+  recommendation: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const dashboard = {
+  screeningRuns: () =>
+    req<{ runs: ScreeningRunSummary[] }>("/screening-runs").then((r) => r.runs),
+  interviews: () =>
+    req<{ interviews: InterviewRecord[] }>("/interviews").then((r) => r.interviews),
+  interviewsForRun: (runId: string) =>
+    req<{ interviews: InterviewRecord[] }>("/interviews").then((r) =>
+      r.interviews.filter((i) => i.run_id === runId)),
 };
 
 /* --------------------------- Document extraction --------------------------- */

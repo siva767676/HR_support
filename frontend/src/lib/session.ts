@@ -19,6 +19,7 @@ export const SESSION_KEYS = {
   jd: "medha:jd",
   screening: "medha:screening",
   interview: "medha:interview",
+  forward: "medha:forward", // {runId} pointer handed from screening to the interview page
 } as const;
 
 function store(): Storage | null {

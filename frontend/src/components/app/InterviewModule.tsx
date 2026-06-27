@@ -1,22 +1,24 @@
 import { useEffect, useRef, useState } from "react";
-import { Bot, ArrowRight, Check, FileText, Upload, Mic, Square } from "lucide-react";
+import { Bot, ArrowRight, Check, FileText, Upload, Mic, Square, Users, ScanSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   Dropdown, Field, PageHeader, Spinner, inputCls,
-  SurfaceCard, SectionTitle, SegmentedControl, StatusChip, hireTone, ScoreMeter,
-  Banner, PhaseProgress,
+  SurfaceCard, SectionTitle, SegmentedControl, StatusChip, hireTone, matchTone, ScoreMeter,
+  Banner, PhaseProgress, EmptyState,
 } from "./ui";
 import { UploadZone } from "./UploadZone";
 import { loadSession, saveSession, clearSession, setBusy, SESSION_KEYS } from "@/lib/session";
 import {
   interview,
   jd as jdApi,
+  screening as screeningApi,
   extractDocument,
   type FinalReport,
   type InterviewTurn,
   type JdRecord,
   type PlannedQuestion,
+  type Shortlist,
 } from "@/lib/api";
 
 type Phase = "setup" | "running" | "done";
@@ -27,15 +29,23 @@ const LEVELS = [
   { value: "senior", label: "Senior" },
 ];
 
+/* Up to two initials for a candidate avatar, from name (or filename). */
+function initials(name: string): string {
+  const parts = name.replace(/\.[^.]+$/, "").split(/[\s_\-.]+/).filter(Boolean);
+  if (!parts.length) return "?";
+  return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
+}
+
 export default function InterviewModule() {
   // The interview thread lives on the server, keyed by thread_id. Persisting the
   // session state lets the user navigate away mid-interview and return to the
   // same question; a lost thread surfaces as a 409 on the next submit (handled).
   const saved = loadSession(SESSION_KEYS.interview, {
-    phase: "setup" as Phase, candidate: "", role: "", level: "mid", maxQ: 5,
+    phase: "setup" as Phase, source: "manual" as "screening" | "manual",
+    candidate: "", role: "", level: "mid", maxQ: 5,
     jdMode: "repo" as "repo" | "upload", jdId: "" as number | "", jdText: "", jdFile: "",
     resumeText: "", resumeFile: "", threadId: "", question: null as PlannedQuestion | null,
-    asked: 0, total: 0, transcript: [] as InterviewTurn[], report: null as FinalReport | null,
+    runId: "", asked: 0, total: 0, transcript: [] as InterviewTurn[], report: null as FinalReport | null,
   });
   const restorable =
     (saved.phase === "running" && !!saved.threadId && !!saved.question) ||
@@ -74,6 +84,13 @@ export default function InterviewModule() {
   // done state
   const [report, setReport] = useState<FinalReport | null>(saved.report);
 
+  // screening-source state: candidates forwarded from a CV Analyzer run
+  const [source, setSource] = useState<"screening" | "manual">(saved.source ?? "manual");
+  const [runId, setRunId] = useState(saved.runId ?? "");
+  const [shortlist, setShortlist] = useState<Shortlist | null>(null);
+  const [loadingShortlist, setLoadingShortlist] = useState(false);
+  const [selectedKey, setSelectedKey] = useState("");
+
   const answerRef = useRef<HTMLTextAreaElement>(null);
   // Web Speech API recognizer (browser STT); typed loosely as it is not in lib.dom for all targets.
   const recognitionRef = useRef<any>(null);
@@ -89,10 +106,39 @@ export default function InterviewModule() {
   // Persist the interview so navigating away mid-session restores the same question.
   useEffect(() => {
     saveSession(SESSION_KEYS.interview, {
-      phase, candidate, role, level, maxQ, jdMode, jdId, jdText, jdFile,
+      phase, source, runId, candidate, role, level, maxQ, jdMode, jdId, jdText, jdFile,
       resumeText, resumeFile, threadId, question, asked, total, transcript, report,
     });
-  }, [phase, candidate, role, level, maxQ, jdMode, jdId, jdText, jdFile, resumeText, resumeFile, threadId, question, asked, total, transcript, report]);
+  }, [phase, source, runId, candidate, role, level, maxQ, jdMode, jdId, jdText, jdFile, resumeText, resumeFile, threadId, question, asked, total, transcript, report]);
+
+  // Consume a "send shortlist to interview" hand-off from the CV Analyzer.
+  useEffect(() => {
+    const fwd = loadSession(SESSION_KEYS.forward, { runId: "" });
+    if (fwd.runId) {
+      clearSession(SESSION_KEYS.forward);
+      setSource("screening");
+      setRunId(fwd.runId);
+      fetchShortlist(fwd.runId);
+    } else if (saved.source === "screening" && saved.runId) {
+      fetchShortlist(saved.runId); // refresh the queue on return
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function fetchShortlist(id: string) {
+    setLoadingShortlist(true);
+    try {
+      const sl = await screeningApi.shortlist(id);
+      setShortlist(sl);
+      // Auto-select the first not-yet-interviewed candidate with a resume.
+      const next = sl.candidates.find((c) => !c.interviewed && c.has_resume);
+      setSelectedKey((k) => k || next?.candidate_key || "");
+    } catch {
+      setShortlist(null);
+    } finally {
+      setLoadingShortlist(false);
+    }
+  }
 
   // Warn before leaving while an interview is live or being planned.
   useEffect(() => {
@@ -163,20 +209,32 @@ export default function InterviewModule() {
 
   async function startInterview() {
     setError("");
-    const jobDescription = resolvedJd();
-    if (!role.trim()) return setError("Enter the role you are interviewing for.");
-    if (!jobDescription) return setError("Select a saved JD or upload a JD file.");
-    if (!resumeText.trim()) return setError("Upload the candidate's resume.");
+    // From-screening mode: role/JD/resume are resolved server-side from the run.
+    const fromScreening = source === "screening";
+    if (fromScreening) {
+      if (!selectedKey) return setError("Select a candidate from the shortlist.");
+    } else {
+      const jobDescription = resolvedJd();
+      if (!role.trim()) return setError("Enter the role you are interviewing for.");
+      if (!jobDescription) return setError("Select a saved JD or upload a JD file.");
+      if (!resumeText.trim()) return setError("Upload the candidate's resume.");
+    }
     setStarting(true);
     try {
-      const res = await interview.start({
-        candidate_name: candidate.trim() || "Candidate",
-        role: role.trim(),
-        experience_level: level,
-        resume_text: resumeText.trim(),
-        job_description: jobDescription,
-        max_questions: maxQ,
-      });
+      const res = await interview.start(
+        fromScreening
+          ? { run_id: runId, candidate_key: selectedKey, experience_level: level, max_questions: maxQ }
+          : {
+              candidate_name: candidate.trim() || "Candidate",
+              role: role.trim(),
+              experience_level: level,
+              resume_text: resumeText.trim(),
+              job_description: resolvedJd(),
+              max_questions: maxQ,
+            },
+      );
+      if (fromScreening) setCandidate(res.candidate_name);
+      setRole(res.role);
       setThreadId(res.thread_id);
       setQuestion(res.question);
       setAsked(1);
@@ -190,6 +248,17 @@ export default function InterviewModule() {
     } finally {
       setStarting(false);
     }
+  }
+
+  // After finishing a forwarded interview, return to the shortlist for the next one.
+  function nextCandidate() {
+    try { recognitionRef.current?.abort(); } catch { /* ignore */ }
+    setRecording(false);
+    setThreadId(""); setQuestion(null); setAnswer(""); setTranscript([]);
+    setReport(null); setAsked(0); setTotal(0); setError("");
+    setSelectedKey("");
+    setPhase("setup");
+    if (runId) fetchShortlist(runId); // refresh interviewed flags
   }
 
   function toggleRecording() {
@@ -292,8 +361,17 @@ export default function InterviewModule() {
     setAsked(0);
     setTotal(0);
     setError("");
+    setSource("manual");
+    setRunId("");
+    setShortlist(null);
+    setSelectedKey("");
     clearSession(SESSION_KEYS.interview);
   }
+
+  const screeningDone = shortlist
+    ? shortlist.candidates.filter((c) => c.interviewed).length
+    : 0;
+  const screeningTotal = shortlist?.candidates.length ?? 0;
 
   return (
     <div>
@@ -307,7 +385,96 @@ export default function InterviewModule() {
       {error && <Banner tone="error" className="mb-6">{error}</Banner>}
 
       {phase === "setup" && (
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="space-y-5">
+          <SegmentedControl
+            value={source}
+            onChange={setSource}
+            options={[
+              { value: "screening", label: "From screening" },
+              { value: "manual", label: "Manual" },
+            ]}
+          />
+
+          {source === "screening" ? (
+            <SurfaceCard className="space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <SectionTitle className="mb-0">Shortlisted candidates</SectionTitle>
+                {screeningTotal > 0 && (
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {screeningDone} of {screeningTotal} interviewed
+                  </span>
+                )}
+              </div>
+              {screeningTotal > 0 && (
+                <PhaseProgress percent={(screeningDone / Math.max(screeningTotal, 1)) * 100} caption="Interview progress" />
+              )}
+
+              {loadingShortlist ? (
+                <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground"><Spinner /> Loading shortlist…</div>
+              ) : !shortlist || screeningTotal === 0 ? (
+                <EmptyState
+                  icon={<Users className="size-7" />}
+                  title="No shortlist forwarded yet"
+                  description="Run a screening in CV Analyzer, then click “Send to AI Interview” to bring the shortlisted candidates here."
+                  action={<a href="/screening" className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium hover:bg-muted"><ScanSearch className="size-4" /> Go to CV Analyzer</a>}
+                />
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    {shortlist.candidates.map((c) => {
+                      const disabled = !c.has_resume;
+                      const active = selectedKey === c.candidate_key;
+                      return (
+                        <button
+                          key={c.candidate_key}
+                          type="button"
+                          disabled={disabled}
+                          onClick={() => setSelectedKey(c.candidate_key)}
+                          title={disabled ? "No resume text available for this candidate" : undefined}
+                          className={cn(
+                            "flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors",
+                            active ? "border-primary bg-primary/5" : "border-border hover:bg-muted",
+                            disabled && "cursor-not-allowed opacity-50",
+                          )}
+                        >
+                          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/15 to-primary/5 text-[11px] font-bold text-primary ring-1 ring-inset ring-primary/15">
+                            {initials(c.candidate_name)}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium text-foreground">{c.candidate_name}</span>
+                            <span className="block truncate text-xs text-muted-foreground">{c.candidate_key}</span>
+                          </span>
+                          {c.overall_score != null && (
+                            <span className="shrink-0 text-sm font-bold tabular-nums text-foreground">{Math.round(c.overall_score)}</span>
+                          )}
+                          {c.interviewed ? (
+                            <StatusChip tone="strong" size="sm"><Check className="mr-1 size-3" /> Done</StatusChip>
+                          ) : c.recommendation ? (
+                            <StatusChip tone={matchTone(c.recommendation)} size="sm">{c.recommendation}</StatusChip>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <Field label="Experience level">
+                      <Dropdown value={level} onChange={setLevel} options={LEVELS} />
+                    </Field>
+                    <Field label="Questions" hint="Between 1 and 12">
+                      <input type="number" min={1} max={12} className={inputCls} value={maxQ}
+                        onChange={(e) => setMaxQ(Math.max(1, Math.min(12, Number(e.target.value) || 5)))} />
+                    </Field>
+                  </div>
+
+                  <Button size="lg" onClick={startInterview} disabled={starting || !selectedKey} className="w-full">
+                    {starting ? <><Spinner /> Planning the interview…</> : <>Start interview <ArrowRight /></>}
+                  </Button>
+                </>
+              )}
+            </SurfaceCard>
+          ) : (
+          <div className="grid gap-6 lg:grid-cols-2">
           <SurfaceCard className="space-y-5">
             <div className="grid gap-5 sm:grid-cols-2">
               <Field label="Candidate name" hint="Optional">
@@ -405,6 +572,8 @@ export default function InterviewModule() {
               </p>
             </div>
           </SurfaceCard>
+          </div>
+          )}
         </div>
       )}
 
@@ -477,7 +646,17 @@ export default function InterviewModule() {
       )}
 
       {phase === "done" && report && (
-        <Report report={report} transcript={transcript} candidate={candidate.trim() || "Candidate"} onRestart={reset} />
+        <Report
+          report={report}
+          transcript={transcript}
+          candidate={candidate.trim() || "Candidate"}
+          onRestart={source === "screening" ? nextCandidate : reset}
+          restartLabel={
+            source === "screening"
+              ? (screeningDone < screeningTotal ? "Next candidate" : "Back to shortlist")
+              : "Start another interview"
+          }
+        />
       )}
     </div>
   );
@@ -500,11 +679,13 @@ function Report({
   transcript,
   candidate,
   onRestart,
+  restartLabel = "Start another interview",
 }: {
   report: FinalReport;
   transcript: InterviewTurn[];
   candidate: string;
   onRestart: () => void;
+  restartLabel?: string;
 }) {
   const [showTranscript, setShowTranscript] = useState(false);
   return (
@@ -565,7 +746,7 @@ function Report({
         <Button variant="outline" size="lg" onClick={() => setShowTranscript((v) => !v)}>
           <FileText /> {showTranscript ? "Hide" : "Show"} transcript ({transcript.length})
         </Button>
-        <Button size="lg" onClick={onRestart}>Start another interview</Button>
+        <Button size="lg" onClick={onRestart}>{restartLabel}</Button>
       </div>
 
       {showTranscript && (

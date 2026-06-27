@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ScanSearch, Download, RotateCcw, Eye, FileText,
-  ChevronLeft, ChevronRight, X, Trash2, Users, CheckCircle2, Award, Gauge,
+  ChevronLeft, ChevronRight, X, Trash2, Users, CheckCircle2, Award, Gauge, Bot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -513,6 +513,14 @@ function Results({ run, resumes, onReset }: { run: ScreeningRun; resumes: File[]
             <Download className="size-4" /> Export Excel
           </a>
           <Button variant="outline" size="lg" onClick={onReset}><RotateCcw /> New run</Button>
+          {run.shortlisted > 0 && (
+            <Button size="lg" onClick={() => {
+              saveSession(SESSION_KEYS.forward, { runId: run.id });
+              window.location.href = "/interview";
+            }}>
+              <Bot /> Send {run.shortlisted} to AI Interview
+            </Button>
+          )}
         </div>
       </div>
 
