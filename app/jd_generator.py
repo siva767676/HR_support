@@ -53,23 +53,80 @@ Guidelines:
 
 async def generate_skills(title: str) -> str:
   """Generate a comma-separated list of required skills for a job role."""
-  prompt = f"""You are an expert recruiter at MY HOME GROUP, a leading Engineering & Construction organization.
-Given the job title below, generate a comma-separated list of core technical and soft skills required for this role.
-Be specific to construction/engineering domain. Output ONLY the comma-separated list, no explanation.
+  prompt = f"""You are an expert recruiter at MY HOME GROUP, specializing in talent acquisition across multiple domains, including Engineering, Construction, IT, AI, Finance, HR, and Operations.
 
-Job title: {title or '(unspecified)'}"""
+Your task is to generate a comma-separated list of ONLY the most relevant skills required for the given job title.
+
+Rules:
+
+* Generate skills strictly related to the provided job title.
+* Do NOT include skills from unrelated domains.
+* Include only skills that are genuinely expected for someone performing this role.
+* Include:
+
+  * Core technical skills
+  * Relevant frameworks, libraries, tools, platforms, and software
+  * Important soft skills specific to the role
+* If the role belongs to Construction/Engineering, include only construction-specific skills relevant to that role.
+* If the role belongs to IT/AI/Software, do NOT include any construction-related skills.
+* If the role belongs to a non-technical domain (HR, Finance, Marketing, etc.), include only skills relevant to that domain.
+* Avoid generic skills unless they are truly essential.
+* Avoid duplicate skills.
+* Do not explain your choices.
+
+Examples:
+
+* "AI Engineer" → Python, PyTorch, TensorFlow, Transformers, LangChain, Docker, Kubernetes, MLOps, AWS, Problem Solving
+* "Quantity Surveyor" → BOQ, Estimation, Cost Control, AutoCAD, Primavera P6, Contract Management, Billing, Quantity Takeoff
+* "HR Manager" → Talent Acquisition, Employee Relations, HRIS, Performance Management, Communication
+
+Output Requirements:
+
+* Return ONLY a comma-separated list.
+* No headings.
+* No numbering.
+* No bullet points.
+* No explanations.
+
+Job Title: {title or "(unspecified)"}
+"""
   result = await evaluator.chat_text(prompt)
   return result.strip()
 
 
 async def generate_responsibilities(title: str) -> str:
   """Generate key responsibilities for a job role as a bullet-point list."""
-  prompt = f"""You are an expert recruiter at MY HOME GROUP, a leading Engineering & Construction organization.
-Given the job title below, generate 4-6 key responsibilities for this role.
-Format as bullet points (each line starts with '- '), be specific to construction/engineering domain.
-Output ONLY the bullet list, no explanation, no title.
+  prompt = f"""You are an expert recruiter at MY HOME GROUP, specializing in talent acquisition across multiple domains, including Engineering, Construction, IT, AI, Finance, HR, Operations, and Corporate functions.
 
-Job title: {title or '(unspecified)'}"""
+Your task is to generate 4-6 key responsibilities for the given job title.
+
+Rules:
+
+* Generate responsibilities strictly relevant to the provided job title.
+* Do NOT include responsibilities from unrelated domains.
+* The responsibilities should reflect real-world industry standards and expectations for this role.
+* Be specific and action-oriented.
+* Use professional language suitable for a Job Description (JD).
+* If the role belongs to Construction/Engineering, include construction-specific responsibilities relevant to that role.
+* If the role belongs to IT/AI/Software, do NOT include any construction-related responsibilities.
+* If the role belongs to HR, Finance, Marketing, or other business domains, include only responsibilities relevant to those domains.
+* Avoid generic responsibilities unless they are truly essential.
+* Avoid duplicate or overlapping responsibilities.
+
+Examples:
+
+* AI Engineer → model development, deployment, MLOps, data pipeline optimization, model evaluation.
+* Quantity Surveyor → BOQ preparation, cost estimation, billing, contract management, quantity takeoff.
+* HR Manager → talent acquisition, employee engagement, performance management, policy implementation.
+
+Output Requirements:
+
+* Return ONLY a bullet list.
+* Each line must start with "- ".
+* Do NOT include headings, titles, numbering, or explanations.
+
+Job Title: {title or "(unspecified)"}
+"""
   result = await evaluator.chat_text(prompt)
   return result.strip()
 

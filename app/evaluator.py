@@ -37,9 +37,8 @@ Job description:
 {jd}
 ---"""
 
-_EVAL_PROMPT = """You are a technical recruiter and CV analyst. Evaluate this resume against the job
-requirements AND extract a structured candidate profile. Base everything on resume evidence only.
-Be strict: missing required skills → score below 50.
+_EVAL_PROMPT = """You are a technical recruiter. Evaluate this resume against the job requirements.
+Base everything on resume evidence only. Be strict: missing required skills → score below 50.
 
 Requirements:
 {requirements}
@@ -54,21 +53,20 @@ Return only JSON:
   "candidate_name": "string or null",
   "candidate_email": "string or null",
   "scores": {{"skills_match": 0-100, "experience_match": 0-100, "education_certifications": 0-100, "domain_relevance": 0-100, "projects_achievements": 0-100}},
-  "required_skills_matched": ["skill1", "skill2"],
-  "required_skills_missing": ["skill1", "skill2"],
+  "required_skills_matched": ["skill1"],
+  "required_skills_missing": ["skill1"],
   "preferred_skills_matched": ["skill1"],
-  "years_experience_estimate": "number or null",
-  "education": ["degree, institution, year"],
-  "experience": ["Job title at Company (dates) — one line"],
-  "projects": ["short project description"],
-  "certifications": ["certification name"],
-  "achievements": ["notable achievement"],
-  "strengths": ["point1", "point2", "point3"],
-  "missing_requirements": ["gap1", "gap2"],
-  "summary": "one or two sentence overall assessment"
+  "years_experience_estimate": 0,
+  "education": ["degree, institution"],
+  "experience": ["Title at Company (years)"],
+  "projects": [],
+  "certifications": [],
+  "achievements": [],
+  "strengths": ["point1", "point2"],
+  "missing_requirements": ["gap1"],
+  "summary": "one sentence"
 }}
-Extract candidate_email and the education/experience/projects/certifications/achievements arrays
-from the resume; use [] when a section is absent and null for a missing email."""
+Use [] for absent sections and null for missing name/email."""
 
 
 async def extract_jd_requirements(jd_text: str) -> dict:
