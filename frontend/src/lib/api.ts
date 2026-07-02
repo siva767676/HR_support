@@ -159,6 +159,7 @@ export interface PlannedQuestion {
   question: string;
   difficulty: "easy" | "medium" | "hard";
   round: "technical" | "hr";
+  is_followup?: boolean;
 }
 
 export interface Evaluation {
@@ -167,9 +168,13 @@ export interface Evaluation {
   completeness_score: number;
   confidence_score: number;
   problem_solving_score: number;
+  analytical_thinking_score: number;
+  domain_expertise_score: number;
+  evidence?: Record<string, string>;
   missing_points: string[];
   suggested_answer: string;
   follow_up_needed: boolean;
+  follow_up_question?: string | null;
 }
 
 export interface InterviewTurn {
@@ -184,8 +189,11 @@ export interface FinalReport {
   communication: number;
   confidence: number;
   problem_solving: number;
+  analytical_thinking: number;
+  domain_expertise: number;
   strengths: string[];
   weaknesses: string[];
+  flags: string[];
   recommendation: "Strong Hire" | "Hire" | "Maybe" | "No Hire";
   summary: string;
 }
@@ -218,12 +226,19 @@ export interface InterviewAnswerResponse {
   transcript: InterviewTurn[];
   report: FinalReport | null;
   done: boolean;
+  total_questions?: number;
+  difficulty_adapted?: boolean;
 }
 
 export const interview = {
   start: (input: InterviewStartInput) => req<InterviewStartResponse>("/interview/start", json(input)),
   answer: (threadId: string, answer: string) =>
     req<InterviewAnswerResponse>("/interview/answer", json({ thread_id: threadId, answer })),
+  transcribeAudio: (audio: Blob) => {
+    const form = new FormData();
+    form.append("audio", audio, "recording.webm");
+    return req<{ text: string }>("/interview/transcribe", { method: "POST", body: form });
+  },
 };
 
 /* --------------------------------- Dashboard ------------------------------- */

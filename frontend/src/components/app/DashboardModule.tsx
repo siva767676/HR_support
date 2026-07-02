@@ -53,7 +53,7 @@ export default function DashboardModule() {
   const empty = !loading && runs.length === 0 && interviews.length === 0;
 
   return (
-    <div>
+    <div className="animate-rise">
       <PageHeader
         icon={<LayoutDashboard className="size-6" />}
         eyebrow="Dashboard"
@@ -79,9 +79,9 @@ export default function DashboardModule() {
           {/* Stats */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatTile label="Screening runs" value={runs.length} icon={<ScanSearch className="size-4" />} />
-            <StatTile label="Candidates screened" value={candidatesScreened} icon={<Users className="size-4" />} />
-            <StatTile label="Interviews done" value={completed.length} icon={<CheckCircle2 className="size-4" />} accent="text-emerald-600" />
-            <StatTile label="Avg interview score" value={avgScore != null ? avgScore : "—"} icon={<Gauge className="size-4" />} />
+            <StatTile label="Candidates screened" value={candidatesScreened} icon={<Users className="size-4" />} iconClass="bg-blue-50 text-blue-600" />
+            <StatTile label="Interviews done" value={completed.length} icon={<CheckCircle2 className="size-4" />} accent="text-emerald-600" iconClass="bg-emerald-50 text-emerald-600" />
+            <StatTile label="Avg interview score" value={avgScore != null ? avgScore : "—"} icon={<Gauge className="size-4" />} iconClass="bg-amber-50 text-amber-600" />
           </div>
 
           {/* Screening runs */}

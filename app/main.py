@@ -497,6 +497,27 @@ async def extract_document(file: UploadFile = File(...)):
     return {"filename": name, "text": text, "chars": len(text)}
 
 
+@app.post("/api/interview/transcribe")
+async def interview_transcribe(audio: UploadFile = File(...)):
+    """Transcribe an audio blob to text using server-side faster-whisper.
+
+    Accepts any audio format MediaRecorder can produce (webm/opus, ogg, wav).
+    Returns {"text": "..."}. Responds 503 if faster-whisper is not installed.
+    """
+    from . import speech as _speech  # lazy: startup unaffected when not installed
+
+    data = await audio.read()
+    if not data:
+        raise HTTPException(400, "Empty audio file")
+    try:
+        text = await asyncio.to_thread(_speech.transcribe_audio, data)
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, f"Transcription failed: {exc}")
+    return {"text": text}
+
+
 @app.post("/api/interview/answer")
 async def interview_answer(payload: dict = Body(...)):
     """Score the current answer and return the next question or the final report."""

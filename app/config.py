@@ -11,10 +11,10 @@ def _v1(url: str) -> str:
 
 
 # Stage 2: LLM evaluation via the OpenAI-compatible endpoint on the GPU host
-# (Ollama at 172.20.7.22:11434). The pinned docker subnet keeps this reachable
+# (vLLM at 172.20.7.22:8000). The pinned docker subnet keeps this reachable
 # from inside the container (see docker-compose.yml).
-VLLM_BASE_URL = _v1(os.getenv("VLLM_BASE_URL", "http://172.20.7.22:11434"))
-VLLM_MODEL = os.getenv("VLLM_MODEL", "gemma4:31b")
+VLLM_BASE_URL = _v1(os.getenv("VLLM_BASE_URL", "http://172.20.7.22:8000/v1"))
+VLLM_MODEL = os.getenv("VLLM_MODEL", "gemma4-31b")
 # "EMPTY" for Ollama (which ignores auth); set it blank to omit the Authorization
 # header entirely (see app.evaluator._auth_headers).
 VLLM_API_KEY = os.getenv("VLLM_API_KEY", "EMPTY")

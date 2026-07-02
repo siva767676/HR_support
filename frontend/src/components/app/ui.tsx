@@ -6,29 +6,36 @@ import { cn } from "@/lib/utils";
    AI Interview) so they stay visually consistent. */
 
 export const inputCls =
-  "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30";
+  "w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm text-foreground outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-muted-foreground hover:border-input/70 focus-visible:border-ring focus-visible:ring-4 focus-visible:ring-ring/15";
 
 export const inputErrCls =
-  "w-full rounded-lg border border-destructive bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-destructive focus-visible:ring-3 focus-visible:ring-destructive/30";
+  "w-full rounded-xl border border-destructive bg-background px-3.5 py-2.5 text-sm text-foreground outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-muted-foreground focus-visible:border-destructive focus-visible:ring-4 focus-visible:ring-destructive/15";
 
 export function PageHeader({
-  icon, eyebrow, title, description,
+  icon, eyebrow, title, description, actions,
 }: {
   icon: React.ReactNode;
   eyebrow: string;
   title: string;
   description: string;
+  actions?: React.ReactNode;
 }) {
   return (
-    <header className="mb-8 flex items-start gap-4">
-      <div className="hidden size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/15 to-primary/5 text-primary ring-1 ring-inset ring-primary/15 shadow-sm sm:flex">
-        {icon}
+    <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start">
+      <div className="flex min-w-0 flex-1 items-start gap-4">
+        <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(145deg,#ee2730,#d11218)] text-white shadow-[0_8px_20px_-6px_rgba(225,26,32,0.5)] ring-1 ring-inset ring-white/20">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <p className="flex items-center gap-2.5 text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+            {eyebrow}
+            <span className="h-px w-7 bg-gradient-to-r from-primary/70 to-transparent" aria-hidden="true" />
+          </p>
+          <h1 className="mt-2 text-balance font-heading text-[1.7rem] font-bold leading-[1.1] tracking-tight text-foreground sm:text-[2rem]">{title}</h1>
+          <p className="mt-2.5 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-[15px]">{description}</p>
+        </div>
       </div>
-      <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">{eyebrow}</p>
-        <h1 className="mt-1.5 font-heading text-2xl font-bold tracking-tight text-foreground sm:text-[2rem] sm:leading-[1.1]">{title}</h1>
-        <p className="mt-2.5 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-[15px]">{description}</p>
-      </div>
+      {actions && <div className="flex shrink-0 items-center gap-2 sm:pt-1">{actions}</div>}
     </header>
   );
 }
@@ -104,11 +111,11 @@ export function Dropdown({
         aria-expanded={open}
         aria-haspopup="listbox"
         className={cn(
-          "flex w-full items-center gap-2 rounded-lg border bg-background px-3 py-2 text-left text-sm outline-none transition-colors hover:bg-muted/40 focus-visible:ring-3",
+          "flex w-full items-center gap-2 rounded-xl border bg-background px-3.5 py-2.5 text-left text-sm outline-none transition-[border-color,box-shadow] duration-150 hover:border-input/70 focus-visible:ring-4",
           invalid
-            ? "border-destructive focus-visible:border-destructive focus-visible:ring-destructive/30"
-            : "border-input focus-visible:border-ring focus-visible:ring-ring/30",
-          open && !invalid && "border-ring ring-3 ring-ring/30",
+            ? "border-destructive focus-visible:border-destructive focus-visible:ring-destructive/15"
+            : "border-input focus-visible:border-ring focus-visible:ring-ring/15",
+          open && !invalid && "border-ring ring-4 ring-ring/15",
         )}
       >
         {icon && <span className="text-muted-foreground">{icon}</span>}
@@ -163,7 +170,7 @@ export function SurfaceCard({
   return (
     <Tag
       className={cn(
-        "rounded-2xl border border-border bg-card shadow-[0_1px_2px_0_rgba(16,24,40,0.04),0_2px_8px_-2px_rgba(16,24,40,0.06)]",
+        "rounded-2xl border border-border bg-card shadow-[0_1px_2px_0_rgba(16,24,40,0.04),0_6px_20px_-8px_rgba(16,24,40,0.10)]",
         PAD[pad],
         hover && "hover-lift",
         className,
@@ -197,7 +204,7 @@ export function SegmentedControl<T extends string>({
   className?: string;
 }) {
   return (
-    <div className={cn("inline-flex w-fit rounded-lg border border-border bg-card p-1", className)}>
+    <div className={cn("inline-flex w-fit gap-1 rounded-xl border border-border/70 bg-muted/60 p-1", className)}>
       {options.map((o) => (
         <button
           key={o.value}
@@ -205,10 +212,10 @@ export function SegmentedControl<T extends string>({
           onClick={() => onChange(o.value)}
           aria-pressed={value === o.value}
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-md font-medium transition-colors",
-            size === "sm" ? "px-3 py-1 text-xs" : "px-3.5 py-1.5 text-sm",
+            "inline-flex items-center gap-1.5 rounded-lg font-medium transition-all duration-150",
+            size === "sm" ? "px-3 py-1 text-xs" : "px-4 py-1.5 text-sm",
             value === o.value
-              ? "bg-primary text-primary-foreground shadow-sm"
+              ? "bg-card text-foreground shadow-[0_1px_2px_rgba(16,24,40,0.06),0_2px_6px_-2px_rgba(16,24,40,0.10)] ring-1 ring-black/[0.04]"
               : "text-muted-foreground hover:text-foreground",
           )}
         >
@@ -318,25 +325,41 @@ export function ScoreMeter({
 /* ───────────────────────────────── Stat tile ──────────────────────────── */
 
 export function StatTile({
-  label, value, accent, icon, className,
+  label, value, accent, icon, iconClass, delta, hint, className,
 }: {
   label: string;
   value: React.ReactNode;
   accent?: string;
   icon?: React.ReactNode;
+  iconClass?: string;
+  delta?: { value: string; dir: "up" | "down" };
+  hint?: React.ReactNode;
   className?: string;
 }) {
   return (
-    <SurfaceCard pad="none" className={cn("p-4", className)}>
+    <SurfaceCard pad="none" className={cn("lift-sm p-4", className)}>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
         {icon && (
-          <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary", iconClass)}>
             {icon}
           </span>
         )}
       </div>
-      <p className={cn("mt-2 font-heading text-2xl font-bold tabular-nums text-foreground", accent)}>{value}</p>
+      <p className={cn("mt-2.5 font-heading text-[1.65rem] font-bold leading-none tracking-tight tabular-nums text-foreground", accent)}>{value}</p>
+      {(delta || hint) && (
+        <div className="mt-2.5 flex items-center gap-2 text-xs text-muted-foreground">
+          {delta && (
+            <span className={cn(
+              "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold tabular-nums",
+              delta.dir === "up" ? "bg-emerald-50 text-emerald-700" : "bg-destructive/10 text-destructive",
+            )}>
+              {delta.dir === "up" ? "↑" : "↓"}{delta.value}
+            </span>
+          )}
+          {hint}
+        </div>
+      )}
     </SurfaceCard>
   );
 }
@@ -488,8 +511,10 @@ export function Stepper({
           <div key={i} className="flex items-center gap-2">
             <span
               className={cn(
-                "inline-flex size-7 items-center justify-center rounded-full text-xs font-bold transition-colors",
-                active ? "bg-primary text-primary-foreground" : done ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground",
+                "inline-flex size-7 items-center justify-center rounded-full text-xs font-bold transition-all",
+                active
+                  ? "bg-[linear-gradient(145deg,#ee2730,#d11218)] text-white shadow-[0_0_0_4px_rgba(225,26,32,0.14)]"
+                  : done ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground",
               )}
             >
               {done ? <Check className="size-4" /> : num}

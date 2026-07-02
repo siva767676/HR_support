@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Bot, ArrowRight, Check, FileText, Upload, Mic, Square, Users, ScanSearch } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Bot, ArrowRight, Check, FileText, Upload, Users, ScanSearch, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -20,6 +20,7 @@ import {
   type PlannedQuestion,
   type Shortlist,
 } from "@/lib/api";
+import InterviewRoom from "./InterviewRoom";
 
 type Phase = "setup" | "running" | "done";
 
@@ -73,16 +74,16 @@ export default function InterviewModule() {
   // running state
   const [threadId, setThreadId] = useState(saved.threadId);
   const [question, setQuestion] = useState<PlannedQuestion | null>(saved.question);
-  const [answer, setAnswer] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [recording, setRecording] = useState(false);
-  const [speechSupported, setSpeechSupported] = useState(false);
-  const [asked, setAsked] = useState(saved.asked); // questions presented so far
-  const [total, setTotal] = useState(saved.total); // questions the model actually planned
+  const [asked, setAsked] = useState(saved.asked);
+  const [total, setTotal] = useState(saved.total);
   const [transcript, setTranscript] = useState<InterviewTurn[]>(saved.transcript);
 
   // done state
   const [report, setReport] = useState<FinalReport | null>(saved.report);
+
+  // adaptive difficulty
+  const [difficultyAdapted, setDifficultyAdapted] = useState(false);
 
   // screening-source state: candidates forwarded from a CV Analyzer run
   const [source, setSource] = useState<"screening" | "manual">(saved.source ?? "manual");
@@ -90,11 +91,6 @@ export default function InterviewModule() {
   const [shortlist, setShortlist] = useState<Shortlist | null>(null);
   const [loadingShortlist, setLoadingShortlist] = useState(false);
   const [selectedKey, setSelectedKey] = useState("");
-
-  const answerRef = useRef<HTMLTextAreaElement>(null);
-  // Web Speech API recognizer (browser STT); typed loosely as it is not in lib.dom for all targets.
-  const recognitionRef = useRef<any>(null);
-  const baseAnswerRef = useRef("");
 
   useEffect(() => {
     jdApi
@@ -146,17 +142,9 @@ export default function InterviewModule() {
     return () => setBusy(false);
   }, [phase, starting]);
 
-  // Detect browser speech-to-text support; abort any live recognizer on unmount.
+  // Cancel any in-progress TTS when the module unmounts.
   useEffect(() => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    setSpeechSupported(!!SR);
-    return () => {
-      try {
-        recognitionRef.current?.abort();
-      } catch {
-        /* ignore */
-      }
-    };
+    return () => { window.speechSynthesis?.cancel(); };
   }, []);
 
   // when a repository JD is chosen, prefill role from its title
@@ -240,9 +228,9 @@ export default function InterviewModule() {
       setAsked(1);
       setTotal(res.total_questions || maxQ);
       setTranscript([]);
-      setAnswer("");
       setReport(null);
       setPhase("running");
+      // InterviewRoom handles TTS via its own useEffect([question?.question])
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start the interview.");
     } finally {
@@ -252,75 +240,24 @@ export default function InterviewModule() {
 
   // After finishing a forwarded interview, return to the shortlist for the next one.
   function nextCandidate() {
-    try { recognitionRef.current?.abort(); } catch { /* ignore */ }
-    setRecording(false);
-    setThreadId(""); setQuestion(null); setAnswer(""); setTranscript([]);
+    window.speechSynthesis?.cancel();
+    setThreadId(""); setQuestion(null); setTranscript([]);
     setReport(null); setAsked(0); setTotal(0); setError("");
     setSelectedKey("");
     setPhase("setup");
-    if (runId) fetchShortlist(runId); // refresh interviewed flags
+    if (runId) fetchShortlist(runId);
   }
 
-  function toggleRecording() {
-    if (recording) {
-      recognitionRef.current?.stop(); // onend flips `recording` off
-      return;
-    }
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) {
-      setSpeechSupported(false);
-      return;
-    }
-    setError("");
-    const rec = new SR();
-    rec.lang = "en-US";
-    rec.continuous = true;
-    rec.interimResults = true;
-    // Append the transcript after whatever is already in the box (supports multiple takes).
-    baseAnswerRef.current = answer ? answer.trimEnd() + " " : "";
-    rec.onresult = (e: any) => {
-      let transcript = "";
-      for (let i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
-      setAnswer(baseAnswerRef.current + transcript);
-    };
-    rec.onerror = (e: any) => {
-      setRecording(false);
-      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
-        setError("Microphone access was blocked. Allow mic permission; voice input needs HTTPS or localhost.");
-      } else if (e.error !== "aborted" && e.error !== "no-speech") {
-        setError(`Voice input error: ${e.error}`);
-      }
-    };
-    rec.onend = () => setRecording(false);
-    recognitionRef.current = rec;
-    try {
-      rec.start();
-      setRecording(true);
-    } catch {
-      /* start() throws if already running; ignore */
-    }
-  }
-
-  async function submitAnswer() {
-    if (!answer.trim() || submitting) return;
-    // Detach and abort any recognizer so a trailing transcript can't bleed into
-    // the next question's answer box.
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.onresult = null;
-        recognitionRef.current.abort();
-      } catch {
-        /* ignore */
-      }
-      recognitionRef.current = null;
-    }
-    if (recording) setRecording(false);
+  // Called by InterviewRoom when voice answer is ready.
+  async function handleAnswerReady(text: string) {
+    if (!text.trim() || submitting) return;
     setError("");
     setSubmitting(true);
     try {
-      const res = await interview.answer(threadId, answer.trim());
+      const res = await interview.answer(threadId, text.trim());
       setTranscript(res.transcript);
-      setAnswer("");
+      if (res.total_questions !== undefined) setTotal(res.total_questions);
+      if (res.difficulty_adapted) setDifficultyAdapted(true);
       if (res.done && res.report) {
         setReport(res.report);
         setQuestion(null);
@@ -328,13 +265,12 @@ export default function InterviewModule() {
       } else if (res.question) {
         setQuestion(res.question);
         setAsked((n) => n + 1);
-        answerRef.current?.focus();
+        setDifficultyAdapted(false);
+        // InterviewRoom auto-speaks and auto-listens when question prop changes
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Could not submit the answer.";
       setError(msg);
-      // 409 = the in-memory session was lost (server restart). Drop back to setup
-      // with the inputs intact so the user can restart immediately.
       if ((e as { status?: number })?.status === 409) {
         setThreadId("");
         setQuestion(null);
@@ -346,16 +282,10 @@ export default function InterviewModule() {
   }
 
   function reset() {
-    try {
-      recognitionRef.current?.abort();
-    } catch {
-      /* ignore */
-    }
-    setRecording(false);
+    window.speechSynthesis?.cancel();
     setPhase("setup");
     setThreadId("");
     setQuestion(null);
-    setAnswer("");
     setTranscript([]);
     setReport(null);
     setAsked(0);
@@ -374,7 +304,7 @@ export default function InterviewModule() {
   const screeningTotal = shortlist?.candidates.length ?? 0;
 
   return (
-    <div>
+    <div className="animate-rise">
       <PageHeader
         icon={<Bot className="size-6" />}
         eyebrow="AI Interview"
@@ -464,12 +394,23 @@ export default function InterviewModule() {
                       <Dropdown value={level} onChange={setLevel} options={LEVELS} />
                     </Field>
                     <Field label="Questions" hint="Between 1 and 12">
-                      <input type="number" min={1} max={12} className={inputCls} value={maxQ}
-                        onChange={(e) => setMaxQ(Math.max(1, Math.min(12, Number(e.target.value) || 5)))} />
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        max={12}
+                        className={cn(inputCls, "no-spinner")}
+                        value={maxQ || ""}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setMaxQ(v === "" ? 0 : Math.max(0, Math.floor(Number(v) || 0)));
+                        }}
+                        placeholder="e.g. 5"
+                      />
                     </Field>
                   </div>
 
-                  <Button size="lg" onClick={startInterview} disabled={starting || !selectedKey} className="w-full">
+                  <Button variant="brand" size="lg" onClick={startInterview} disabled={starting || !selectedKey} className="w-full">
                     {starting ? <><Spinner /> Planning the interview…</> : <>Start interview <ArrowRight /></>}
                   </Button>
                 </>
@@ -491,11 +432,16 @@ export default function InterviewModule() {
               <Field label="Questions" hint="Between 1 and 12">
                 <input
                   type="number"
+                  inputMode="numeric"
                   min={1}
                   max={12}
-                  className={inputCls}
-                  value={maxQ}
-                  onChange={(e) => setMaxQ(Math.max(1, Math.min(12, Number(e.target.value) || 5)))}
+                  className={cn(inputCls, "no-spinner")}
+                  value={maxQ || ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setMaxQ(v === "" ? 0 : Math.max(0, Math.floor(Number(v) || 0)));
+                  }}
+                  placeholder="e.g. 5"
                 />
               </Field>
             </div>
@@ -566,7 +512,7 @@ export default function InterviewModule() {
               ) : undefined}
             />
             <div className="mt-auto pt-6">
-              <Button size="lg" onClick={startInterview} disabled={starting || extracting || jdExtracting} className="w-full">
+              <Button variant="brand" size="lg" onClick={startInterview} disabled={starting || extracting || jdExtracting} className="w-full">
                 {starting ? <><Spinner /> Planning the interview…</> : <>Start interview <ArrowRight /></>}
               </Button>
               <p className="mt-2 text-center text-xs text-muted-foreground">
@@ -580,72 +526,19 @@ export default function InterviewModule() {
       )}
 
       {phase === "running" && question && (
-        <div className="mx-auto max-w-3xl space-y-6">
-          <Stepper steps={["Pick", "Interview", "Report"]} current={2} />
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium capitalize text-muted-foreground">
-                {question.round}
-              </span>
-              <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium capitalize text-primary">
-                {question.difficulty}
-              </span>
-            </div>
-            <button onClick={reset} className="text-xs font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
-              Start over
-            </button>
-          </div>
-
-          <PhaseProgress
-            percent={(asked / Math.max(total, 1)) * 100}
-            caption={`Question ${asked} of ${total}`}
-          />
-
-          <SurfaceCard className="mt-6">
-            <p className="text-xs font-semibold uppercase tracking-wide text-primary">{question.topic}</p>
-            <p className="mt-2 text-lg font-medium leading-relaxed text-foreground">{question.question}</p>
-          </SurfaceCard>
-
-          <div className="mt-4">
-            <div className="relative">
-              <textarea
-                ref={answerRef}
-                autoFocus
-                className={cn(inputCls, "min-h-40 resize-y", recording && "border-primary ring-3 ring-primary/20")}
-                value={answer}
-                onChange={(e) => setAnswer(e.target.value)}
-                placeholder={recording ? "Listening… speak the answer" : "Record the answer with the mic, or type it"}
-                onKeyDown={(e) => {
-                  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") submitAnswer();
-                }}
-              />
-              {recording && (
-                <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-                  <span className="size-2 animate-pulse rounded-full bg-primary" /> Listening
-                </span>
-              )}
-            </div>
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                {speechSupported && (
-                  <Button type="button" variant={recording ? "default" : "outline"} size="lg" onClick={toggleRecording}>
-                    {recording ? <><Square /> Stop recording</> : <><Mic /> Record answer</>}
-                  </Button>
-                )}
-                <span className="text-xs text-muted-foreground">
-                  {recording ? "Click stop when finished" : "Ctrl or Cmd + Enter to submit"}
-                </span>
-              </div>
-              <Button size="lg" onClick={submitAnswer} disabled={submitting || !answer.trim()}>
-                {submitting ? (
-                  <><Spinner /> {asked >= total ? "Scoring and writing report…" : "Scoring answer…"}</>
-                ) : (
-                  <>{asked >= total ? "Finish and get report" : "Submit answer"} <ArrowRight /></>
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
+        <InterviewRoom
+          question={question}
+          asked={asked}
+          total={total}
+          candidate={candidate.trim() || "Candidate"}
+          role={role}
+          transcript={transcript}
+          submitting={submitting}
+          difficultyAdapted={difficultyAdapted}
+          error={error}
+          onAnswerReady={handleAnswerReady}
+          onReset={reset}
+        />
       )}
 
       {phase === "done" && report && (
@@ -655,6 +548,7 @@ export default function InterviewModule() {
             report={report}
             transcript={transcript}
             candidate={candidate.trim() || "Candidate"}
+            role={role}
           onRestart={source === "screening" ? nextCandidate : reset}
           restartLabel={
             source === "screening"
@@ -684,16 +578,89 @@ function Report({
   report,
   transcript,
   candidate,
+  role,
   onRestart,
   restartLabel = "Start another interview",
 }: {
   report: FinalReport;
   transcript: InterviewTurn[];
   candidate: string;
+  role: string;
   onRestart: () => void;
   restartLabel?: string;
 }) {
   const [showTranscript, setShowTranscript] = useState(false);
+
+  function downloadPdf() {
+    const DIM_LABELS: Record<string, string> = {
+      technical_skills: "Technical skills", communication: "Communication",
+      confidence: "Confidence", problem_solving: "Problem solving",
+      analytical_thinking: "Analytical thinking", domain_expertise: "Domain expertise",
+    };
+    const dims = Object.entries(DIM_LABELS).map(([k, label]) => {
+      const v = (report as any)[k] ?? 0;
+      return `<div class="dim"><div class="dim-label"><span>${label}</span><span>${v}/10</span></div>
+        <div class="bar"><div class="bar-fill" style="width:${(v/10)*100}%"></div></div></div>`;
+    }).join("");
+    const strengths = report.strengths.map((s) => `<li>${s}</li>`).join("") || "<li>None noted.</li>";
+    const weaknesses = report.weaknesses.map((s) => `<li>${s}</li>`).join("") || "<li>None noted.</li>";
+    const flags = report.flags?.length
+      ? `<div class="flags"><h3>⚑ Integrity flags</h3><ul>${report.flags.map((f) => `<li>${f}</li>`).join("")}</ul></div>` : "";
+    const txRows = transcript.map((t, i) => `
+      <div class="turn">
+        <p class="q-label">Q${i+1} · ${t.question.topic} <span class="badge">${t.question.difficulty}</span></p>
+        <p class="q-text">${t.question.question}</p>
+        <p class="ans">${t.answer || "(no answer given)"}</p>
+        <p class="scores">Technical ${t.evaluation.technical_score}/10 &nbsp;
+          Communication ${t.evaluation.communication_score}/10 &nbsp;
+          Problem solving ${t.evaluation.problem_solving_score}/10 &nbsp;
+          Analytical ${(t.evaluation.analytical_thinking_score??0)}/10 &nbsp;
+          Domain ${(t.evaluation.domain_expertise_score??0)}/10</p>
+      </div>`).join("");
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (!w) return;
+    w.document.documentElement.innerHTML = `<head><meta charset="utf-8">
+      <title>Interview Report — ${candidate}</title>
+      <style>
+        body{font-family:system-ui,sans-serif;max-width:820px;margin:0 auto;padding:32px;color:#1a1a1a}
+        h1{font-size:26px;font-weight:700;margin:0}h2{font-size:15px;font-weight:600;margin:16px 0 8px}
+        .meta{color:#666;font-size:13px;margin-bottom:20px}
+        .score-big{font-size:52px;font-weight:700;line-height:1}
+        .rec{display:inline-block;padding:3px 12px;border-radius:999px;font-size:13px;font-weight:700;background:#E11A20;color:#fff;margin-left:12px}
+        .bar{height:8px;background:#e5e7eb;border-radius:4px;margin-top:4px}
+        .bar-fill{height:8px;background:#E11A20;border-radius:4px}
+        .dim{margin:10px 0}.dim-label{display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px}
+        .grid{display:grid;grid-template-columns:1fr 1fr;gap:0 24px}
+        ul{margin:4px 0;padding-left:18px;font-size:13px;line-height:1.8}
+        .flags{background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:12px;margin-top:16px}
+        .flags h3{margin:0 0 6px;font-size:13px;color:#92400e}
+        .turn{border-top:1px solid #e5e7eb;padding:12px 0}
+        .q-label{font-size:11px;font-weight:700;color:#E11A20;text-transform:uppercase;margin:0}
+        .q-text{font-size:14px;font-weight:600;margin:4px 0}
+        .ans{background:#f9fafb;padding:8px;border-radius:4px;font-size:13px;margin:6px 0;white-space:pre-wrap}
+        .scores{font-size:11px;color:#6b7280;margin:0}.badge{background:#fee2e2;color:#991b1b;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600}
+        .summary{font-size:13px;color:#444;line-height:1.6;margin-top:12px;padding:12px;background:#f9fafb;border-radius:6px}
+        @media print{button{display:none!important}}
+      </style></head><body>
+      <h1>${candidate}</h1>
+      <p class="meta">${role} · Interview Report</p>
+      <div style="display:flex;align-items:baseline;gap:8px">
+        <span class="score-big">${report.overall_score}</span>
+        <span style="color:#666;font-size:14px">/100 overall</span>
+        <span class="rec">${report.recommendation}</span>
+      </div>
+      ${report.summary ? `<p class="summary">${report.summary}</p>` : ""}
+      <h2>Dimension scores</h2><div class="grid">${dims}</div>
+      <div class="grid" style="margin-top:16px">
+        <div><h2>Strengths</h2><ul>${strengths}</ul></div>
+        <div><h2>Areas to probe</h2><ul>${weaknesses}</ul></div>
+      </div>
+      ${flags}
+      <h2 style="margin-top:24px">Transcript (${transcript.length} questions)</h2>${txRows}
+      <p style="margin-top:24px;text-align:center"><button onclick="window.print();window.close()" style="padding:8px 24px;background:#E11A20;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px">Print / Save as PDF</button></p>
+    </body></html>`;
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <SurfaceCard className="sm:p-8">
@@ -715,11 +682,13 @@ function Report({
           <ScoreMeter value={report.overall_score} size="lg" />
         </div>
 
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Bar label="Technical skills" value={report.technical_skills} />
           <Bar label="Communication" value={report.communication} />
           <Bar label="Confidence" value={report.confidence} />
           <Bar label="Problem solving" value={report.problem_solving} />
+          <Bar label="Analytical thinking" value={report.analytical_thinking ?? 0} />
+          <Bar label="Domain expertise" value={report.domain_expertise ?? 0} />
         </div>
 
         {report.summary && <p className="mt-6 text-sm leading-relaxed text-muted-foreground">{report.summary}</p>}
@@ -746,13 +715,35 @@ function Report({
             </ul>
           </div>
         </div>
+
+        {report.flags && report.flags.length > 0 && (
+          <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-amber-800">
+              <AlertTriangle className="size-4" /> Integrity flags
+            </p>
+            <ul className="space-y-1.5">
+              {report.flags.map((f, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-amber-700">
+                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-amber-500" /> {f}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </SurfaceCard>
 
       <div className="flex flex-wrap items-center gap-3">
         <Button variant="outline" size="lg" onClick={() => setShowTranscript((v) => !v)}>
           <FileText /> {showTranscript ? "Hide" : "Show"} transcript ({transcript.length})
         </Button>
-        <Button size="lg" onClick={onRestart}>{restartLabel}</Button>
+        <Button variant="outline" size="lg" onClick={downloadPdf}>
+          <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Download PDF
+        </Button>
+        <Button variant="brand" size="lg" onClick={onRestart}>{restartLabel}</Button>
       </div>
 
       {showTranscript && (
@@ -772,9 +763,23 @@ function Report({
                 <span>Completeness {t.evaluation.completeness_score}/10</span>
                 <span>Confidence {t.evaluation.confidence_score}/10</span>
                 <span>Problem solving {t.evaluation.problem_solving_score}/10</span>
+                <span>Analytical thinking {(t.evaluation.analytical_thinking_score ?? 0)}/10</span>
+                <span>Domain expertise {(t.evaluation.domain_expertise_score ?? 0)}/10</span>
               </div>
+              {t.evaluation.evidence && Object.keys(t.evaluation.evidence).length > 0 && (
+                <details className="mt-2 text-xs">
+                  <summary className="cursor-pointer font-medium text-primary">Evidence</summary>
+                  <ul className="mt-1.5 space-y-0.5 pl-2 text-muted-foreground">
+                    {Object.entries(t.evaluation.evidence).map(([dim, quote]) => (
+                      <li key={dim}>
+                        <span className="font-medium capitalize text-foreground">{dim.replace(/_/g, " ")}</span>: "{quote}"
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
               {t.evaluation.suggested_answer && (
-                <details className="mt-3 text-sm">
+                <details className="mt-2 text-sm">
                   <summary className="cursor-pointer font-medium text-primary">Model answer</summary>
                   <p className="mt-2 leading-relaxed text-muted-foreground">{t.evaluation.suggested_answer}</p>
                 </details>

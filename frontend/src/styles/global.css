@@ -157,6 +157,12 @@
   50% { transform: translateY(-3px); }
 }
 
+/* Full-screen interview room entrance */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 /* Preview panel entrance: slide in from the right + fade. Used by JD Generation. */
 @keyframes jd-slide-in-right {
   from { opacity: 0; transform: translateX(40px); }
@@ -184,6 +190,43 @@
 @media (prefers-reduced-motion: reduce) {
   .hover-lift { transition: none; }
   .hover-lift:hover { transform: none; }
+}
+
+/* App canvas — a calm dual-tone brand mesh over a soft neutral, fixed so it stays
+   stable while content scrolls. Applied to the app shell (not the landing page). */
+.app-bg {
+  background-color: color-mix(in oklch, var(--muted) 30%, var(--background));
+  background-image:
+    radial-gradient(820px 460px at 100% -8%, color-mix(in oklch, var(--primary) 6%, transparent), transparent 60%),
+    radial-gradient(640px 420px at -4% 2%, color-mix(in oklch, var(--primary) 3.5%, transparent), transparent 55%);
+  background-attachment: fixed;
+}
+
+/* Page entrance — content rises and fades in once on mount. Tasteful, single-shot. */
+@keyframes medha-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+.animate-rise { animation: medha-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise { animation: none; }
+}
+
+/* Soft neutral hover-lift for stat tiles & list cards — gentler than .hover-lift
+   (no red glow), so non-interactive surfaces feel responsive without shouting. */
+.lift-sm {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.lift-sm:hover {
+  transform: translateY(-0.2rem);
+  border-color: color-mix(in oklch, var(--foreground) 12%, transparent);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 12px 28px -10px rgba(16, 24, 40, 0.18);
+}
+@media (prefers-reduced-motion: reduce) {
+  .lift-sm { transition: none; }
+  .lift-sm:hover { transform: none; }
 }
 
 /* Skeleton shimmer — a translucent sweep over a muted base. Used by loading states. */

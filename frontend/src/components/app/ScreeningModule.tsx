@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import {
-  Dropdown, PageHeader, Spinner, inputCls,
+  Dropdown, PageHeader, Spinner, inputCls, inputErrCls,
   SurfaceCard, SectionTitle, SegmentedControl, StatusChip, matchTone,
   ScoreMeter, StatTile, Banner, ErrorState, PhaseProgress, Stepper,
 } from "./ui";
@@ -233,8 +233,18 @@ function ScreeningInner() {
     return done + 5; // small bump to show the stage started
   }
 
+  // "Candidates to score in depth" must be a whole number > 0 and no more than
+  // the number of uploaded resumes (you can't score more candidates than exist).
+  const maxK = resumes.length;
+  const topKError =
+    topK < 1
+      ? "Enter a number greater than 0."
+      : maxK > 0 && topK > maxK
+      ? `Cannot exceed the ${maxK} uploaded resume${maxK === 1 ? "" : "s"}.`
+      : "";
+
   return (
-    <div>
+    <div className="animate-rise">
       <PageHeader
         icon={<ScanSearch className="size-6" />}
         eyebrow="CV Analyzer"
@@ -244,26 +254,33 @@ function ScreeningInner() {
 
       {error && <Banner tone="error" className="mb-6">{error}</Banner>}
 
-      {/* ── Setup phase ── */}
+      {/* ── Setup phase — two panels: upload (left) · configure + run (right) ── */}
       {phase === "setup" && (
-        <div className="space-y-5">
-          <UploadZone
-            mode="both"
-            variant="dropzone"
-            accept={SUPPORTED}
-            onFiles={processIncoming}
-            title="Drag & drop resume files here"
-            hint="Supports PDF, DOCX, TXT, and MD · up to 100 resumes per run"
-            tip={<>Click <strong>Browse Folder</strong> multiple times to add resumes from different folders — each selection appends to the list below.</>}
-          />
+        <div className="grid gap-5 lg:grid-cols-2 lg:items-stretch">
+          {/* LEFT · Resume upload */}
+          <SurfaceCard pad="none" className="flex flex-col overflow-hidden">
+            <div className="flex flex-1 flex-col p-5 sm:p-6">
+              <UploadZone
+                mode="both"
+                variant="dropzone"
+                accept={SUPPORTED}
+                onFiles={processIncoming}
+                title="Drag & drop resume files here"
+                hint="Supports PDF, DOCX, TXT, and MD · up to 100 resumes per run"
+                tip={<>Click <strong>Browse Folder</strong> multiple times to add resumes from different folders — each selection appends to the list below.</>}
+                className="flex h-full flex-col justify-center border-border/70 bg-muted/15"
+              />
+              {resumes.length > 0 && (
+                <div className="mt-4">
+                  <ResumeFileList embedded files={resumes} onRemove={removeResume} onClear={() => setResumes([])} />
+                </div>
+              )}
+            </div>
+          </SurfaceCard>
 
-          {resumes.length > 0 && (
-            <ResumeFileList files={resumes} onRemove={removeResume} onClear={() => setResumes([])} />
-          )}
-
-          <div className="grid gap-5 lg:grid-cols-2">
-            {/* JD card */}
-            <SurfaceCard pad="md" className="flex flex-col">
+          {/* RIGHT · Job description + screening settings + run */}
+          <SurfaceCard pad="none" className="flex flex-col overflow-hidden">
+            <div className="p-5 sm:p-6">
               <SectionTitle>Job description</SectionTitle>
               <SegmentedControl
                 className="mb-4"
@@ -289,38 +306,47 @@ function ScreeningInner() {
                   onChange={(e) => setJdFile(e.target.files?.[0] ?? null)}
                 />
               )}
-            </SurfaceCard>
+            </div>
 
-            {/* Settings + Run */}
-            <SurfaceCard pad="md" className="flex flex-col">
+            <div className="border-t border-border p-5 sm:p-6">
               <SectionTitle>Screening settings</SectionTitle>
               <label className="block">
                 <span className="mb-1.5 block text-sm font-medium text-foreground">Candidates to score in depth</span>
                 <input
                   type="number"
+                  inputMode="numeric"
                   min={1}
-                  max={100}
-                  className={inputCls}
-                  value={topK}
-                  onChange={(e) => setTopK(Math.max(1, Math.min(100, Number(e.target.value) || 10)))}
+                  max={maxK || undefined}
+                  className={cn(topKError ? inputErrCls : inputCls, "no-spinner")}
+                  value={topK || ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setTopK(v === "" ? 0 : Math.max(0, Math.floor(Number(v) || 0)));
+                  }}
+                  placeholder={maxK > 0 ? `Enter 1 to ${maxK}` : "e.g. 10"}
                 />
-                <p className="mt-1 text-xs text-muted-foreground">
-                  The closest matches by semantic similarity are shortlisted and scored by the model.
-                </p>
-              </label>
-              <div className="mt-auto pt-5">
-                <Button size="lg" onClick={startRun} disabled={!resumes.length} className="w-full">
-                  <ScanSearch />
-                  {resumes.length > 0
-                    ? `Screen ${resumes.length} resume${resumes.length === 1 ? "" : "s"}`
-                    : "Run screening"}
-                </Button>
-                {!resumes.length && (
-                  <p className="mt-2 text-center text-xs text-muted-foreground">Add resumes above to continue</p>
+                {topKError ? (
+                  <p className="mt-1.5 text-xs text-destructive">{topKError}</p>
+                ) : (
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    The closest matches by semantic similarity are shortlisted and scored by the model.
+                  </p>
                 )}
-              </div>
-            </SurfaceCard>
-          </div>
+              </label>
+            </div>
+
+            <div className="mt-auto border-t border-border bg-muted/15 p-5 sm:p-6">
+              <Button variant="brand" size="lg" onClick={startRun} disabled={!resumes.length || !!topKError} className="w-full">
+                <ScanSearch />
+                {resumes.length > 0
+                  ? `Screen ${resumes.length} resume${resumes.length === 1 ? "" : "s"}`
+                  : "Run screening"}
+              </Button>
+              {!resumes.length && (
+                <p className="mt-2 text-center text-xs text-muted-foreground">Add resumes to continue</p>
+              )}
+            </div>
+          </SurfaceCard>
         </div>
       )}
 
@@ -372,11 +398,12 @@ function ScreeningInner() {
 
 /* ─── Selected-file list ─────────────────────────────────────────────────── */
 function ResumeFileList({
-  files, onRemove, onClear,
+  files, onRemove, onClear, embedded = false,
 }: {
   files: File[];
   onRemove: (idx: number) => void;
   onClear: () => void;
+  embedded?: boolean;
 }) {
   const totalSize = files.reduce((s, f) => s + f.size, 0);
 
@@ -387,8 +414,18 @@ function ResumeFileList({
     return { label: ext || "FILE", cls: "bg-muted text-muted-foreground ring-border" };
   }
 
+  // When embedded inside the unified setup card, drop the card chrome (border +
+  // shadow) so it reads as a nested section rather than a competing box.
+  const Wrap = embedded
+    ? ({ children }: { children: React.ReactNode }) => (
+        <div className="overflow-hidden rounded-xl border border-border">{children}</div>
+      )
+    : ({ children }: { children: React.ReactNode }) => (
+        <SurfaceCard pad="none" className="overflow-hidden">{children}</SurfaceCard>
+      );
+
   return (
-    <SurfaceCard pad="none" className="overflow-hidden">
+    <Wrap>
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border bg-muted/20 px-5 py-3.5">
         <div className="flex items-center gap-3">
@@ -445,7 +482,7 @@ function ResumeFileList({
           {files.length} / 100
         </span>
       </div>
-    </SurfaceCard>
+    </Wrap>
   );
 }
 
@@ -515,7 +552,7 @@ function Results({ run, resumes, onReset }: { run: ScreeningRun; resumes: File[]
           </a>
           <Button variant="outline" size="lg" onClick={onReset}><RotateCcw /> New run</Button>
           {run.shortlisted > 0 && (
-            <Button size="lg" onClick={() => {
+            <Button variant="brand" size="lg" onClick={() => {
               saveSession(SESSION_KEYS.forward, { runId: run.id });
               window.location.href = "/interview";
             }}>
@@ -527,9 +564,9 @@ function Results({ run, resumes, onReset }: { run: ScreeningRun; resumes: File[]
 
       <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatTile label="Resumes" value={run.total} icon={<Users className="size-4" />} />
-        <StatTile label="Shortlisted" value={run.shortlisted} icon={<CheckCircle2 className="size-4" />} />
-        <StatTile label="Strong matches" value={strong} accent="text-emerald-600" icon={<Award className="size-4" />} />
-        <StatTile label="Avg score" value={avg != null ? avg : "—"} icon={<Gauge className="size-4" />} />
+        <StatTile label="Shortlisted" value={run.shortlisted} icon={<CheckCircle2 className="size-4" />} iconClass="bg-blue-50 text-blue-600" />
+        <StatTile label="Strong matches" value={strong} accent="text-emerald-600" icon={<Award className="size-4" />} iconClass="bg-emerald-50 text-emerald-600" />
+        <StatTile label="Avg score" value={avg != null ? avg : "—"} icon={<Gauge className="size-4" />} iconClass="bg-amber-50 text-amber-600" />
       </div>
 
       {run.file_errors?.length > 0 && (

@@ -99,25 +99,40 @@ const deliverables = [
 /* ------------------------------ Scroll progress ----------------------------- */
 function ScrollProgress() {
   const [p, setP] = useState(0);
+  const barRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
+    let rafId: number;
+
     const onScroll = () => {
-      const el = document.documentElement;
-      const max = el.scrollHeight - el.clientHeight;
-      setP(max > 0 ? (el.scrollTop / max) * 100 : 0);
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const el = document.documentElement;
+        const max = el.scrollHeight - el.clientHeight;
+        const progress = max > 0 ? (el.scrollTop / max) * 100 : 0;
+        if (barRef.current) {
+          barRef.current.style.width = `${progress}%`;
+        }
+      });
     };
+
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
+
     return () => {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
+      if (rafId) cancelAnimationFrame(rafId);
     };
   }, []);
+
   return (
     <div className="fixed inset-x-0 top-0 z-[60] h-[3px] bg-transparent">
       <div
-        className="h-full bg-gradient-to-r from-primary to-[#FF7A45] shadow-[0_0_12px_rgba(225,26,32,0.5)] transition-[width] duration-100 ease-out"
-        style={{ width: `${p}%` }}
+        ref={barRef}
+        className="h-full bg-gradient-to-r from-primary to-[#FF7A45] shadow-[0_0_12px_rgba(225,26,32,0.5)] will-change-[width]"
+        style={{ width: "0%" }}
       />
     </div>
   );

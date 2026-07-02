@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 MAX_QUESTIONS_CAP = 12
 MAX_RETAINED_SESSIONS = 50
+MAX_FOLLOWUPS_PER_INTERVIEW = 2
 
 # thread_id -> session dict. In-memory only (see module docstring).
 _SESSIONS: dict[str, dict] = {}
@@ -87,11 +88,28 @@ Return ONLY a JSON object:
   "completeness_score": 0,
   "confidence_score": 0,
   "problem_solving_score": 0,
+  "analytical_thinking_score": 0,
+  "domain_expertise_score": 0,
+  "evidence": {{}},
   "missing_points": ["what a strong answer should have covered but did not"],
   "suggested_answer": "a concise model answer",
-  "follow_up_needed": false
+  "follow_up_needed": false,
+  "follow_up_question": null
 }}
-All five scores are integers from 0 to 10. No commentary, no code fences."""
+
+Scores are integers 0-10:
+- technical_score: accuracy and depth of technical knowledge demonstrated
+- communication_score: clarity, structure, and articulation
+- completeness_score: how thoroughly the question was addressed
+- confidence_score: assertiveness and certainty in delivery
+- problem_solving_score: logical approach, structured thinking
+- analytical_thinking_score: data-driven reasoning, analysis of trade-offs, inferences drawn
+- domain_expertise_score: industry-specific knowledge relevant to {role}
+
+"evidence": map up to 3 dimension keys (e.g. "technical", "problem_solving") to a short verbatim quote (≤20 words) from the answer supporting the score. Omit dimensions with no notable evidence.
+"follow_up_needed": true only if the answer was vague, incomplete, or evasive on a critical point.
+"follow_up_question": if follow_up_needed is true, write a focused follow-up on the same topic (one level deeper); otherwise null.
+No commentary, no code fences."""
 
 _REPORT_PROMPT = """You are writing the final interview report for a {role} candidate
 (experience level: {level}). Weigh the full transcript below; reward depth and clarity,
@@ -107,13 +125,18 @@ Return ONLY a JSON object:
   "communication": 0,
   "confidence": 0,
   "problem_solving": 0,
+  "analytical_thinking": 0,
+  "domain_expertise": 0,
   "strengths": ["concrete strength"],
   "weaknesses": ["concrete weakness"],
+  "flags": [],
   "recommendation": "Hire",
   "summary": "two or three sentence overall assessment"
 }}
-overall_score is an integer from 0 to 100; the four dimension scores are numbers from 0 to 10;
-recommendation is exactly one of: Strong Hire, Hire, Maybe, No Hire. No commentary, no code fences."""
+overall_score is an integer from 0 to 100; the six dimension scores are numbers from 0 to 10;
+recommendation is exactly one of: Strong Hire, Hire, Maybe, No Hire.
+"flags": list up to 3 short integrity or consistency concerns (e.g. "Claimed Python expertise but struggled with basic syntax"). Return an empty array if none.
+No commentary, no code fences."""
 
 
 # --------------------------------- helpers ----------------------------------
@@ -170,16 +193,57 @@ def _clean_question(raw: dict, index: int) -> dict:
 
 def _clean_evaluation(raw) -> dict:
     raw = _as_dict(raw)
+    ev = raw.get("evidence")
+    fq = str(raw.get("follow_up_question") or "").strip()
     return {
         "technical_score": _as_int(raw.get("technical_score"), 0, 10),
         "communication_score": _as_int(raw.get("communication_score"), 0, 10),
         "completeness_score": _as_int(raw.get("completeness_score"), 0, 10),
         "confidence_score": _as_int(raw.get("confidence_score"), 0, 10),
         "problem_solving_score": _as_int(raw.get("problem_solving_score"), 0, 10),
+        "analytical_thinking_score": _as_int(raw.get("analytical_thinking_score"), 0, 10),
+        "domain_expertise_score": _as_int(raw.get("domain_expertise_score"), 0, 10),
+        "evidence": ev if isinstance(ev, dict) else {},
         "missing_points": _as_list(raw.get("missing_points")),
         "suggested_answer": str(raw.get("suggested_answer") or "").strip(),
         "follow_up_needed": bool(raw.get("follow_up_needed", False)),
+        "follow_up_question": fq or None,
     }
+
+
+def _adapt_difficulty(sess: dict) -> bool:
+    """After each answer, nudge the remaining questions' difficulty up or down
+    based on the last two answers' combined technical + problem_solving average.
+    Returns True when any question was changed (frontend can show a badge)."""
+    transcript = sess["transcript"]
+    if len(transcript) < 2:
+        return False
+    recent = transcript[-2:]
+    avg = sum(
+        (t["evaluation"]["technical_score"] + t["evaluation"]["problem_solving_score"]) / 2
+        for t in recent
+    ) / 2
+    remaining = sess["questions"][sess["idx"]:]
+    changed = False
+    if avg >= 7.5:
+        for q in remaining:
+            if not q.get("is_followup"):
+                if q["difficulty"] == "easy":
+                    q["difficulty"] = "medium"
+                    changed = True
+                elif q["difficulty"] == "medium":
+                    q["difficulty"] = "hard"
+                    changed = True
+    elif avg <= 3.5:
+        for q in remaining:
+            if not q.get("is_followup"):
+                if q["difficulty"] == "hard":
+                    q["difficulty"] = "medium"
+                    changed = True
+                elif q["difficulty"] == "medium":
+                    q["difficulty"] = "easy"
+                    changed = True
+    return changed
 
 
 def _clean_report(raw) -> dict:
@@ -191,8 +255,11 @@ def _clean_report(raw) -> dict:
         "communication": _as_num(raw.get("communication"), 0, 10),
         "confidence": _as_num(raw.get("confidence"), 0, 10),
         "problem_solving": _as_num(raw.get("problem_solving"), 0, 10),
+        "analytical_thinking": _as_num(raw.get("analytical_thinking"), 0, 10),
+        "domain_expertise": _as_num(raw.get("domain_expertise"), 0, 10),
         "strengths": _as_list(raw.get("strengths")),
         "weaknesses": _as_list(raw.get("weaknesses")),
+        "flags": _as_list(raw.get("flags")),
         "recommendation": rec if rec in _VALID_RECOMMENDATION else "Maybe",
         "summary": str(raw.get("summary") or "").strip(),
     }
@@ -253,6 +320,7 @@ async def start_interview(
         "idx": 0,
         "transcript": [],
         "report": None,
+        "follow_up_count": 0,
     }
     # Bound retained sessions so a long-lived server doesn't grow unbounded.
     while len(_SESSIONS) > MAX_RETAINED_SESSIONS:
@@ -288,6 +356,8 @@ async def submit_answer(thread_id: str, answer: str) -> dict:
             "transcript": sess["transcript"],
             "report": sess.get("report"),
             "done": True,
+            "total_questions": len(sess["questions"]),
+            "difficulty_adapted": False,
         }
 
     question = sess["questions"][sess["idx"]]
@@ -307,6 +377,26 @@ async def submit_answer(thread_id: str, answer: str) -> dict:
     sess["transcript"].append(turn)
     sess["idx"] += 1
 
+    # Inject a follow-up question right after this one when the LLM flagged a gap,
+    # but cap total injections so a weak candidate can't extend the session forever.
+    if (
+        evaluation.get("follow_up_needed")
+        and evaluation.get("follow_up_question")
+        and sess["follow_up_count"] < MAX_FOLLOWUPS_PER_INTERVIEW
+    ):
+        follow_up = {
+            "topic": question.get("topic", "Follow-up"),
+            "question": evaluation["follow_up_question"],
+            "difficulty": question.get("difficulty", "medium"),
+            "round": question.get("round", "technical"),
+            "is_followup": True,
+        }
+        sess["questions"].insert(sess["idx"], follow_up)
+        sess["follow_up_count"] += 1
+
+    # Nudge remaining question difficulties up/down based on recent performance trend.
+    difficulty_adapted = _adapt_difficulty(sess)
+
     if sess["idx"] < len(sess["questions"]):
         return {
             "thread_id": thread_id,
@@ -315,6 +405,8 @@ async def submit_answer(thread_id: str, answer: str) -> dict:
             "transcript": sess["transcript"],
             "report": None,
             "done": False,
+            "total_questions": len(sess["questions"]),
+            "difficulty_adapted": difficulty_adapted,
         }
 
     report = await _build_report(sess)
@@ -326,6 +418,8 @@ async def submit_answer(thread_id: str, answer: str) -> dict:
         "transcript": sess["transcript"],
         "report": report,
         "done": True,
+        "total_questions": len(sess["questions"]),
+        "difficulty_adapted": False,
     }
 
 

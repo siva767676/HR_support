@@ -107,6 +107,7 @@ function JdModuleInner() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [body, setBody] = useState(saved.body);
   const [editing, setEditing] = useState(saved.editing);
+  const [editingOriginal, setEditingOriginal] = useState(""); // original body when edit mode entered
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -117,6 +118,9 @@ function JdModuleInner() {
   const [generatingSkills, setGeneratingSkills] = useState(false);
   const [generatingResponsibilities, setGeneratingResponsibilities] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
+
+  // Track if content has changed since entering edit mode
+  const hasChanges = body !== editingOriginal;
 
   // repository
   const [search, setSearch] = useState("");
@@ -220,11 +224,15 @@ function JdModuleInner() {
     if (!fields.responsibilities?.trim()) {
       errs.responsibilities = "Key responsibilities are required to generate a meaningful JD.";
     }
-    if (expMin !== "") {
+    if (expMin === "") {
+      errs.expMin = "Minimum experience is required.";
+    } else {
       const min = Number(expMin);
       if (!Number.isFinite(min) || min < 0 || min > 50) errs.expMin = "Enter a value between 0 and 50.";
     }
-    if (expMax !== "") {
+    if (expMax === "") {
+      errs.expMax = "Maximum experience is required.";
+    } else {
       const max = Number(expMax);
       if (!Number.isFinite(max) || max < 0 || max > 50) errs.expMax = "Enter a value between 0 and 50.";
     }
@@ -281,6 +289,22 @@ function JdModuleInner() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function enterEditMode() {
+    setEditingOriginal(body);
+    setEditing(true);
+  }
+
+  function cancelEditMode() {
+    setBody(editingOriginal);
+    setEditing(false);
+    setEditingOriginal("");
+  }
+
+  function exitEditMode() {
+    setEditing(false);
+    setEditingOriginal("");
   }
 
   async function copyBody() {
@@ -379,23 +403,32 @@ function JdModuleInner() {
       />
     );
 
+  // Mandatory fields must be present before generation is allowed. (Range/format
+  // errors are still surfaced by validateFields() on submit.)
+  const formComplete =
+    fields.title.trim() !== "" &&
+    (fields.skills ?? "").trim() !== "" &&
+    (fields.responsibilities ?? "").trim() !== "" &&
+    expMin.trim() !== "" &&
+    expMax.trim() !== "";
+
   return (
-    <div className="overflow-x-clip">
+    <div className="animate-rise overflow-x-clip">
       <PageHeader
         icon={<FileText className="size-6" />}
         eyebrow="JD Generation"
         title="Job Descriptions"
         description="Turn a few inputs into a complete JD in the company standard template, then save it to the repository to reuse in screening and interviews."
-      />
-
-      <SegmentedControl
-        className="mb-6"
-        value={tab}
-        onChange={(t) => { setTab(t); setError(""); }}
-        options={[
-          { value: "generate", label: "Generate" },
-          { value: "repository", label: "Repository" },
-        ]}
+        actions={
+          <SegmentedControl
+            value={tab}
+            onChange={(t) => { setTab(t); setError(""); }}
+            options={[
+              { value: "generate", label: "Generate" },
+              { value: "repository", label: "Repository" },
+            ]}
+          />
+        }
       />
 
       {error && <Banner tone="error" className="mb-6">{error}</Banner>}
@@ -443,7 +476,9 @@ function JdModuleInner() {
                 </Field>
                 {/* Experience: min + max number inputs */}
                 <div>
-                  <span className="mb-1.5 block text-sm font-medium text-foreground">Experience (years)</span>
+                  <span className="mb-1.5 block text-sm font-medium text-foreground">
+                    Experience (years)<span className="ml-0.5 text-destructive">*</span>
+                  </span>
                   <div className="flex items-center gap-2">
                     <div className="flex-1">
                       <input
@@ -532,9 +567,14 @@ function JdModuleInner() {
                 <textarea className={cn(inputCls, "min-h-20 resize-y")} value={fields.requirements} onChange={(e) => set("requirements", e.target.value)} placeholder="Optional" />
               </Field>
 
-              <Button size="lg" onClick={generate} disabled={generating} className="w-full">
+              <Button variant="brand" size="lg" onClick={generate} disabled={generating || !formComplete} className="w-full">
                 {generating ? <><Spinner /> Generating JD…</> : <><Sparkles /> Generate JD</>}
               </Button>
+              {!formComplete && !generating && (
+                <p className="mt-2 text-center text-xs text-muted-foreground">
+                  Fill in all required fields (marked *) to continue
+                </p>
+              )}
             </SurfaceCard>
 
             {/* -------- Preview: hidden until Generate, then slides in from the right (~65%) -------- */}
@@ -556,22 +596,35 @@ function JdModuleInner() {
                       </div>
                       {body && !generating && (
                         <div className="flex items-center gap-1.5">
-                          <Button variant="ghost" size="sm" onClick={() => setEditing((v) => !v)}>
-                            {editing ? <><Eye /> Preview</> : <><Pencil /> Edit</>}
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={copyBody}>
-                            {copied ? <><Check className="text-emerald-600" /> Copied</> : <><Copy /> Copy</>}
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => setExpanded(true)}>
-                            <Maximize2 /> Expand
-                          </Button>
-                          <Button size="sm" onClick={save} disabled={saving}>
-                            {saving ? <><Spinner /> Saving…</> : <><Save /> Save</>}
-                          </Button>
+                          {editing ? (
+                            <>
+                              <Button variant="ghost" size="sm" onClick={cancelEditMode}>
+                                <X /> Cancel
+                              </Button>
+                              <Button size="sm" onClick={exitEditMode} disabled={!hasChanges}>
+                                <Check /> Done
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button variant="ghost" size="sm" onClick={enterEditMode}>
+                                <Pencil /> Edit
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={copyBody}>
+                                {copied ? <><Check className="text-emerald-600" /> Copied</> : <><Copy /> Copy</>}
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => setExpanded(true)}>
+                                <Maximize2 /> Expand
+                              </Button>
+                              <Button size="sm" onClick={save} disabled={saving}>
+                                {saving ? <><Spinner /> Saving…</> : <><Save /> Save</>}
+                              </Button>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
-                    <div className="h-[32rem] overflow-auto p-6 lg:h-auto lg:min-h-0 lg:flex-1 lg:p-8">
+                    <div className={cn("h-[32rem] p-6 lg:h-auto lg:min-h-0 lg:flex-1 lg:p-8", editing ? "overflow-hidden" : "overflow-auto")}>
                       {previewContent}
                     </div>
                   </SurfaceCard>
@@ -664,19 +717,32 @@ function JdModuleInner() {
                 )}
               </div>
               <div className="flex items-center gap-1.5">
-                <Button variant="ghost" size="sm" onClick={() => setEditing((v) => !v)}>
-                  {editing ? <><Eye /> Preview</> : <><Pencil /> Edit</>}
-                </Button>
-                <Button variant="ghost" size="sm" onClick={copyBody}>
-                  {copied ? <><Check className="text-emerald-600" /> Copied</> : <><Copy /> Copy</>}
-                </Button>
-                <Button size="sm" onClick={save} disabled={saving}>
-                  {saving ? <><Spinner /> Saving…</> : <><Save /> Save</>}
-                </Button>
+                {editing ? (
+                  <>
+                    <Button variant="ghost" size="sm" onClick={cancelEditMode}>
+                      <X /> Cancel
+                    </Button>
+                    <Button size="sm" onClick={exitEditMode} disabled={!hasChanges}>
+                      <Check /> Done
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button variant="ghost" size="sm" onClick={enterEditMode}>
+                      <Pencil /> Edit
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={copyBody}>
+                      {copied ? <><Check className="text-emerald-600" /> Copied</> : <><Copy /> Copy</>}
+                    </Button>
+                    <Button size="sm" onClick={save} disabled={saving}>
+                      {saving ? <><Spinner /> Saving…</> : <><Save /> Save</>}
+                    </Button>
+                  </>
+                )}
                 <Button variant="ghost" size="icon-sm" aria-label="Collapse full screen" onClick={() => setExpanded(false)}><Minimize2 /></Button>
               </div>
             </div>
-            <div className="flex-1 overflow-auto px-6 py-6 sm:px-8">
+            <div className={cn("flex-1 px-6 py-6 sm:px-8", editing ? "overflow-hidden" : "overflow-auto")}>
               {editing ? (
                 <textarea
                   className="mx-auto block h-full w-full max-w-3xl resize-none rounded-lg border border-border bg-background p-4 font-mono text-sm leading-relaxed text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
